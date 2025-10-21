@@ -1,0 +1,7 @@
+
+. {
+    auto {
+        directory /tmp/coredock/
+        reload 10s
+    }
+}
