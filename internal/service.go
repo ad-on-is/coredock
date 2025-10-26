@@ -25,7 +25,6 @@ type Service struct {
 
 func (s Service) String() string {
 	jsonStr, _ := json.MarshalIndent(s, "", "  ")
-	fmt.Println(string(jsonStr))
 	return string(jsonStr)
 }
 
@@ -58,9 +57,7 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 		}
 	}
 
-	if s.Name == "jellyfin" {
-		logger.Debugf("%v", s)
-	}
+	logger.Debugf("%v", s)
 	return s
 }
 

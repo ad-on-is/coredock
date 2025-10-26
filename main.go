@@ -5,7 +5,7 @@ import (
 	"github.com/thoas/go-funk"
 )
 
-var logger = internal.InitLogger(0)
+var logger = internal.InitLogger()
 
 func main() {
 	err := internal.CreateZoneDir()
@@ -13,8 +13,9 @@ func main() {
 		logger.Errorf("Error initializing zone files: %s", err)
 		panic(1)
 	}
-	internal.InitLogger(0)
 	config := internal.NewConfig()
+
+	internal.InitLogger()
 
 	serviceChan := make(chan *internal.Service)
 	d, err := internal.NewDockerClient(serviceChan, config)

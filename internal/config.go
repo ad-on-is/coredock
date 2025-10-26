@@ -2,9 +2,8 @@ package internal
 
 import (
 	"os"
+	"strconv"
 	"strings"
-
-	"github.com/alecthomas/kingpin"
 )
 
 type Config struct {
@@ -22,19 +21,19 @@ func NewConfig() *Config {
 		IPPrefixes: []string{},
 	}
 
-	app := kingpin.New("coredock", "CoreDNS Docker integration")
-	var (
-		domains    = app.Flag("domains", "Domains to use").String()
-		networks   = app.Flag("networks", "Auto-connect containers to these networks").String()
-		ttl        = app.Flag("ttl", "Time to live for DNS records.").Default("300").Int()
-		ipPrefixes = app.Flag("ip-prefixes", "Only include IPs with the given prefix.").String()
-	)
-	kingpin.MustParse(app.Parse(os.Args[1:]))
+	domains := os.Getenv("COREDOCK_DOMAINS")
+	networks := os.Getenv("COREDOCK_NETWORKS")
+	ipPrefixes := os.Getenv("COREDOCK_IP_PREFIXES")
+	ttlStr := os.Getenv("COREDOCK_TTL")
+	ttl := 300
 
-	c.TTL = *ttl
-	c.Domains = strings.Split(*domains, ",")
-	c.Networks = strings.Split(*networks, ",")
-	c.IPPrefixes = strings.Split(*ipPrefixes, ",")
+	if t, err := strconv.Atoi(ttlStr); err == nil {
+		ttl = t
+	}
 
+	c.TTL = ttl
+	c.Domains = strings.Split(domains, ",")
+	c.Networks = strings.Split(networks, ",")
+	c.IPPrefixes = strings.Split(ipPrefixes, ",")
 	return c
 }

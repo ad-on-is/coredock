@@ -33,11 +33,24 @@ func (l *Logger) Errorf(format string, args ...any) {
 	l.Error(fmt.Sprintf(format, args...))
 }
 
-var logger = InitLogger(0)
+var logger = InitLogger()
 
-func InitLogger(level int) *Logger {
+func InitLogger() *Logger {
+	level := os.Getenv("COREDOCK_DEBUG_LEVEL")
+	l := slog.LevelInfo
+	switch level {
+	case "debug":
+		l = slog.LevelDebug
+	case "info":
+		l = slog.LevelInfo
+	case "warn":
+		l = slog.LevelWarn
+	case "error":
+		l = slog.LevelError
+	}
+
 	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
-		Level:      slog.LevelDebug,
+		Level:      l,
 		TimeFormat: time.RFC3339,
 	}))
 	return New(logger)

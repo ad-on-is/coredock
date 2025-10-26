@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sync"
 
 	"github.com/miekg/dns"
 )
 
 type ZoneHandler struct {
 	config *Config
+	mux    *sync.Mutex
 }
 
 func NewZoneHandler(config *Config) *ZoneHandler {
-	return &ZoneHandler{config: config}
+	return &ZoneHandler{config: config, mux: &sync.Mutex{}}
 }
 
 func CreateZoneDir() error {
@@ -27,18 +29,18 @@ func CreateZoneDir() error {
 	// Placeholder function to match the file name.
 }
 
-func getZoneFile(domain string) (string, error) {
+func (z *ZoneHandler) getZoneFile(domain string) (string, error) {
 	f := "/tmp/coredock/db." + domain
 	_, err := os.Stat(f)
 	if os.IsNotExist(err) {
 		if err := os.WriteFile(f, []byte(""), 0o644); err != nil {
-			return "", fmt.Errorf("Error creating zone file for domain %s: %s", domain, err)
+			return "", fmt.Errorf("error creating zone file for domain %s: %s", domain, err)
 		}
 		return "", nil
 	}
 	data, err := os.ReadFile("/tmp/coredock/db." + domain)
 	if err != nil {
-		return "", fmt.Errorf("Error reading zone file for domain %s: %s", domain, err)
+		return "", fmt.Errorf("error reading zone file for domain %s: %s", domain, err)
 	}
 	return string(data), nil
 }
@@ -59,23 +61,28 @@ func replaceWrapper(contents string, str string, start string, end string) strin
 	return contents
 }
 
-func (z *ZoneHandler) writeZoneEntry(domain string, name string, soa dns.RR, recordset ...[]dns.RR) error {
-	contents, err := getZoneFile(domain)
+func (z *ZoneHandler) writeZoneEntry(domain string, name string, delete bool, soa dns.RR, recordset ...[]dns.RR) error {
+	z.mux.Lock()
+	defer z.mux.Unlock()
+	contents, err := z.getZoneFile(domain)
 	if err != nil {
 		return err
 	}
 
 	records := ""
-	header := fmt.Sprintf("$ORIGIN %s.\n$TTL %d\n%s\n", domain, z.config.TTL, soa.String())
 
-	for _, set := range recordset {
-		for _, r := range set {
-			records += r.String() + "\n"
+	if delete {
+		contents = replaceWrapper(contents, "", fmt.Sprintf("; %s BEGIN", name), fmt.Sprintf("; %s END", name))
+	} else {
+		header := fmt.Sprintf("$ORIGIN %s.\n$TTL %d\n%s\n", domain, z.config.TTL, soa.String())
+		for _, set := range recordset {
+			for _, r := range set {
+				records += r.String() + "\n"
+			}
 		}
+		contents = replaceWrapper(contents, header, "; header BEGIN", "; header END")
+		contents = replaceWrapper(contents, records, fmt.Sprintf("; %s BEGIN", name), fmt.Sprintf("; %s END", name))
 	}
-
-	contents = replaceWrapper(contents, header, "; header BEGIN", "; header END")
-	contents = replaceWrapper(contents, records, fmt.Sprintf("; %s BEGIN", name), fmt.Sprintf("; %s END", name))
 
 	err = os.WriteFile("/tmp/coredock/db."+domain, []byte(contents), 0o644)
 	if err != nil {
@@ -85,24 +92,24 @@ func (z *ZoneHandler) writeZoneEntry(domain string, name string, soa dns.RR, rec
 }
 
 func (z *ZoneHandler) Create(s *Service, d *DNSProvider) {
+	logger.Infof("Service %sed: %s", s.Action, s.Name)
 	for _, domain := range s.Domains {
 
 		soa := d.GetSOARecord(s, domain)
-		logger.Debugf("%s", soa.String())
 
 		aRecords := d.GetARecords(s, domain)
-		for arr := range aRecords {
-			logger.Debugf("%s", aRecords[arr].String())
-		}
-		srvRecords := d.GetSRVRecords(s, domain)
-		for srv := range srvRecords {
-			logger.Debugf("%s", srvRecords[srv].String())
-		}
-		logger.Infof("Service %sed: %s", s.Action, s.Name)
 
-		z.writeZoneEntry(domain, s.Name, soa, aRecords, srvRecords)
+		srvRecords := d.GetSRVRecords(s, domain)
+
+		z.writeZoneEntry(domain, s.Name, false, soa, aRecords, srvRecords)
 
 	}
 }
 
-func (z *ZoneHandler) Delete(s *Service) {}
+func (z *ZoneHandler) Delete(s *Service) {
+	logger.Infof("Service %sed: %s", s.Action, s.Name)
+
+	for _, domain := range s.Domains {
+		z.writeZoneEntry(domain, s.Name, true, nil, []dns.RR{})
+	}
+}
