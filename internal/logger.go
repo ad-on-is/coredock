@@ -36,7 +36,7 @@ func (l *Logger) Errorf(format string, args ...any) {
 var logger = InitLogger()
 
 func InitLogger() *Logger {
-	level := os.Getenv("COREDOCK_DEBUG_LEVEL")
+	level := os.Getenv("COREDOCK_LOG_LEVEL")
 	l := slog.LevelInfo
 	switch level {
 	case "debug":

@@ -4,7 +4,12 @@ go 1.25.2
 
 require github.com/fsouza/go-dockerclient v1.12.2
 
-require github.com/stretchr/testify v1.9.0 // indirect
+require (
+	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
+	github.com/golang-queue/queue v0.4.0 // indirect
+	github.com/jpillora/backoff v1.0.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
+)
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect

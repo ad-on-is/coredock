@@ -4,13 +4,16 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/thoas/go-funk"
 )
 
 type Config struct {
-	Domains    []string
-	Networks   []string
-	TTL        int
-	IPPrefixes []string
+	Domains          []string
+	Networks         []string
+	TTL              int
+	IPPrefixes       []string
+	IPPrefixesIgnore []string
 }
 
 func NewConfig() *Config {
@@ -22,8 +25,12 @@ func NewConfig() *Config {
 	}
 
 	domains := os.Getenv("COREDOCK_DOMAINS")
+	if domains == "" {
+		domains = "docker"
+	}
 	networks := os.Getenv("COREDOCK_NETWORKS")
 	ipPrefixes := os.Getenv("COREDOCK_IP_PREFIXES")
+	ipPrefixesIgnore := os.Getenv("COREDOCK_IGNORE_IP_PREFIXES")
 	ttlStr := os.Getenv("COREDOCK_TTL")
 	ttl := 300
 
@@ -32,8 +39,10 @@ func NewConfig() *Config {
 	}
 
 	c.TTL = ttl
-	c.Domains = strings.Split(domains, ",")
-	c.Networks = strings.Split(networks, ",")
-	c.IPPrefixes = strings.Split(ipPrefixes, ",")
+	c.Domains = funk.Filter(strings.Split(domains, ","), func(s string) bool { return s != "" }).([]string)
+	c.Networks = funk.Filter(strings.Split(networks, ","), func(s string) bool { return s != "" }).([]string)
+	c.IPPrefixes = funk.Filter(strings.Split(ipPrefixes, ","), func(s string) bool { return s != "" }).([]string)
+	c.IPPrefixesIgnore = funk.Filter(strings.Split(ipPrefixesIgnore, ","), func(s string) bool { return s != "" }).([]string)
+
 	return c
 }
