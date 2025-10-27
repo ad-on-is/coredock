@@ -19,10 +19,6 @@ func NewDNSProvider(c *Config) *DNSProvider {
 
 func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 	rrs := []dns.RR{}
-	if len(service.IPs) == 0 {
-		logger.Errorf("No valid IP address found for service '%s' ", service.Name)
-		return rrs
-	}
 
 	for _, n := range service.GetHosts(domain) {
 		for _, ip := range service.IPs {
@@ -69,7 +65,7 @@ func (s *DNSProvider) GetSOARecord(service *Service, domain string) dns.RR {
 		},
 		Ns:      "coredock." + dom,
 		Mbox:    "coredock.coredock." + dom,
-		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
+		Serial:  uint32(time.Now().Truncate(time.Second).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
 		Expire:  604800,

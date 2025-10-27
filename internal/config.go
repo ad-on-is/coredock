@@ -22,6 +22,9 @@ func NewConfig() *Config {
 	}
 
 	domains := os.Getenv("COREDOCK_DOMAINS")
+	if domains == "" {
+		domains = "docker"
+	}
 	networks := os.Getenv("COREDOCK_NETWORKS")
 	ipPrefixes := os.Getenv("COREDOCK_IP_PREFIXES")
 	ttlStr := os.Getenv("COREDOCK_TTL")
