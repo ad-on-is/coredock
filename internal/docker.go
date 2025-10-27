@@ -15,7 +15,7 @@ type DockerClient struct {
 }
 
 func NewDockerClient(channel chan *Service, conf *Config) (*DockerClient, error) {
-	client, err := docker.NewClient("unix:///var/run/docker.sock")
+	client, err := docker.NewClientFromEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -27,14 +27,17 @@ func (d *DockerClient) Run() error {
 
 	d.client.AddEventListener(dockerChan)
 
-	containers, err := d.client.ListContainers(docker.ListContainersOptions{All: true})
+	containers, err := d.getContainers()
 	if err != nil {
 		return fmt.Errorf("error getting containers: %w", err)
 	}
 
-	for _, c := range containers {
-		d.channel <- NewService(&c, "start", d.config)
-	}
+	go func() {
+		for _, c := range containers {
+			d.maybeConnectToNetwork(&c)
+			d.channel <- NewService(&c, "start", d.config)
+		}
+	}()
 
 	for e := range dockerChan {
 		d.handleService(e)
@@ -42,8 +45,24 @@ func (d *DockerClient) Run() error {
 	return nil
 }
 
-func (d *DockerClient) findContainer(id string) (*docker.APIContainers, error) {
+func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 	containers, err := d.client.ListContainers(docker.ListContainersOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("error getting containers: %w", err)
+	}
+	return funk.Filter(containers, func(c docker.APIContainers) bool {
+		labels := c.Labels
+		_, ok := labels["coredock.ignore"]
+		if ok {
+			logger.Debugf("Ignoring container '%s' due to 'coredock.ignore' label", cleanContainerName(c.Names[0]))
+		}
+		return !ok
+	}).([]docker.APIContainers), nil
+}
+
+func (d *DockerClient) findContainer(id string) (*docker.APIContainers, error) {
+	d.client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: id})
+	containers, err := d.getContainers()
 	if err != nil {
 		return nil, fmt.Errorf("error getting containers: %w", err)
 	}
@@ -54,6 +73,17 @@ func (d *DockerClient) findContainer(id string) (*docker.APIContainers, error) {
 		}
 	}
 	return nil, fmt.Errorf("container '%s' not found", shortContainerID(id))
+}
+
+func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
+	for _, nw := range d.config.Networks {
+		dnw, err := d.findNetwork(nw)
+		if err != nil {
+			continue
+		}
+		logger.Debugf("Connected '%s' to network '%s'", cleanContainerName(c.Names[0]), dnw.Name)
+		d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+	}
 }
 
 func (d *DockerClient) handleService(e *docker.APIEvents) {
@@ -73,7 +103,23 @@ func (d *DockerClient) handleService(e *docker.APIEvents) {
 		logger.Debugf("Could not handle service for actcion '%s': %v", e.Action, err)
 		return
 	}
+	d.maybeConnectToNetwork(c)
+
 	d.channel <- NewService(c, e.Action, d.config)
+}
+
+func (d *DockerClient) findNetwork(name string) (*docker.Network, error) {
+	networks, err := d.client.ListNetworks()
+	if err != nil {
+		return nil, fmt.Errorf("error getting networks: %w", err)
+	}
+
+	for _, n := range networks {
+		if n.Name == name {
+			return &n, nil
+		}
+	}
+	return nil, fmt.Errorf("network '%s' not found", name)
 }
 
 func cleanContainerName(name string) string {

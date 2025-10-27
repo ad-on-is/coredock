@@ -24,20 +24,22 @@ func main() {
 	}
 	zone := internal.NewZoneHandler(config)
 	dns := internal.NewDNSProvider(config)
+
 	go func() {
-		d.Run()
+		err := d.Run()
+		if err != nil {
+			panic(err)
+		}
 	}()
 
 	for s := range serviceChan {
-		createHandler := []string{"create", "start", "connect"}
+		createHandler := []string{"create", "start", "connect", "disconnect"}
 
 		if funk.Contains(createHandler, s.Action) {
 			zone.Create(s, dns)
 		} else {
 			zone.Delete(s)
 		}
-
-		// deleteZone
 
 	}
 }

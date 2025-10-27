@@ -22,18 +22,6 @@ func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 
 	for _, n := range service.GetHosts(domain) {
 		for _, ip := range service.IPs {
-			foundPrefix := false
-
-			for _, p := range d.config.IPPrefixes {
-				if strings.HasPrefix(ip.String(), p) {
-					foundPrefix = true
-					break
-				}
-			}
-
-			if !foundPrefix && len(d.config.IPPrefixes) > 0 {
-				continue
-			}
 
 			rr := new(dns.A)
 

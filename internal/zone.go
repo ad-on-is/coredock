@@ -93,7 +93,7 @@ func (z *ZoneHandler) writeZoneEntry(domain string, name string, delete bool, so
 
 func (z *ZoneHandler) Create(s *Service, d *DNSProvider) {
 	if len(s.IPs) == 0 {
-		logger.Warnf("Skipping %s: No valid IP address found.", s.Name)
+		logger.Debugf("Skipping %s: No valid IP address found.", s.Name)
 		return
 	}
 	for _, domain := range s.Domains {
@@ -107,11 +107,11 @@ func (z *ZoneHandler) Create(s *Service, d *DNSProvider) {
 		z.writeZoneEntry(domain, s.Name, false, soa, aRecords, srvRecords)
 
 	}
-	logger.Infof("Service %sed: %s", s.Action, s.Name)
+	logger.Infof("Service '%s' added with IPs: %s", s.Name, s.IPs)
 }
 
 func (z *ZoneHandler) Delete(s *Service) {
-	logger.Infof("Service %sed: %s", s.Action, s.Name)
+	logger.Infof("Service '%s' removed", s.Name)
 	for _, domain := range s.Domains {
 		z.writeZoneEntry(domain, s.Name, true, nil, []dns.RR{})
 	}

@@ -33,6 +33,28 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 	for _, netw := range c.Networks.Networks {
 		ip := net.ParseIP(netw.IPAddress)
 		if ip != nil {
+
+			foundPrefix := false
+			ignorePrefix := false
+
+			for _, p := range conf.IPPrefixes {
+				if strings.HasPrefix(ip.String(), p) {
+					foundPrefix = true
+					break
+				}
+			}
+
+			for _, p := range conf.IPPrefixesIgnore {
+				if strings.HasPrefix(ip.String(), p) {
+
+					ignorePrefix = true
+					break
+				}
+			}
+			if !foundPrefix && len(conf.IPPrefixes) > 0 || ignorePrefix && len(conf.IPPrefixesIgnore) > 0 {
+				continue
+			}
+
 			ips = append(ips, ip)
 		}
 	}
@@ -57,7 +79,6 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 		}
 	}
 
-	logger.Debugf("%v", s)
 	return s
 }
 
