@@ -66,11 +66,14 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 	}
 	return funk.Filter(containers, func(c docker.APIContainers) bool {
 		labels := c.Labels
-		_, ok := labels["coredock.ignore"]
-		if ok {
+		_, isIgnored := labels["coredock.ignore"]
+		if isIgnored {
 			logger.Debugf("Ignoring container '%s' due to 'coredock.ignore' label", cleanContainerName(c.Names[0]))
 		}
-		return !ok
+
+		isCoredock := strings.Contains(c.Image, "coredock")
+
+		return !isIgnored && !isCoredock
 	}).([]docker.APIContainers), nil
 }
 
