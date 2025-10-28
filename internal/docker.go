@@ -1,9 +1,11 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/cenkalti/backoff/v5"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/thoas/go-funk"
 )
@@ -40,6 +42,7 @@ func (d *DockerClient) Run() error {
 	}()
 
 	for e := range dockerChan {
+		logger.Debugf("Received event from Docker: %v", e)
 		d.handleService(e)
 	}
 	return nil
@@ -61,28 +64,42 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 }
 
 func (d *DockerClient) findContainer(id string) (*docker.APIContainers, error) {
-	d.client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: id})
-	containers, err := d.getContainers()
-	if err != nil {
-		return nil, fmt.Errorf("error getting containers: %w", err)
-	}
-
-	for _, c := range containers {
-		if c.ID == id {
-			return &c, nil
+	return backoff.Retry(context.TODO(), func() (*docker.APIContainers, error) {
+		containers, err := d.getContainers()
+		if err != nil {
+			return nil, fmt.Errorf("error getting containers: %w", err)
 		}
-	}
-	return nil, fmt.Errorf("container '%s' not found", shortContainerID(id))
+
+		for _, c := range containers {
+			ips := 0
+			if c.ID == id {
+				for _, nw := range c.Networks.Networks {
+					for range nw.IPAddress {
+						ips++
+					}
+				}
+				if ips == 0 {
+					return nil, fmt.Errorf("container '%s' has no IP address assigned yet", shortContainerID(id))
+				}
+				return &c, nil
+			}
+		}
+		return nil, fmt.Errorf("container '%s' not found", shortContainerID(id))
+	}, backoff.WithMaxTries(5), backoff.WithBackOff(backoff.NewExponentialBackOff()))
 }
 
 func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 	for _, nw := range d.config.Networks {
 		dnw, err := d.findNetwork(nw)
 		if err != nil {
+			logger.Errorf("Error finding network '%s': %v", nw, err)
 			continue
 		}
 		logger.Debugf("Connected '%s' to network '%s'", cleanContainerName(c.Names[0]), dnw.Name)
-		d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+		err = d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+		if err != nil && !strings.Contains(err.Error(), "already exists") {
+			logger.Errorf("Error connecting container '%s' to network '%s': %v", cleanContainerName(c.Names[0]), dnw.Name, err)
+		}
 	}
 }
 
@@ -100,11 +117,11 @@ func (d *DockerClient) handleService(e *docker.APIEvents) {
 
 	c, err := d.findContainer(id)
 	if err != nil {
-		logger.Debugf("Could not handle service for actcion '%s': %v", e.Action, err)
+		logger.Debugf("Could not handle service for action '%s': %v", e.Action, err)
 		return
 	}
-	d.maybeConnectToNetwork(c)
 
+	d.maybeConnectToNetwork(c)
 	d.channel <- NewService(c, e.Action, d.config)
 }
 

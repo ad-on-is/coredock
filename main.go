@@ -16,7 +16,6 @@ func main() {
 	config := internal.NewConfig()
 
 	internal.InitLogger()
-
 	serviceChan := make(chan *internal.Service)
 	d, err := internal.NewDockerClient(serviceChan, config)
 	if err != nil {
@@ -33,7 +32,9 @@ func main() {
 	}()
 
 	for s := range serviceChan {
-		createHandler := []string{"create", "start", "connect", "disconnect"}
+		createHandler := []string{"create", "start", "connect"}
+
+		logger.Debugf("Handling container '%s': %s", s.Name, s.Action)
 
 		if funk.Contains(createHandler, s.Action) {
 			zone.Create(s, dns)
