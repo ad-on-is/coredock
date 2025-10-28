@@ -31,7 +31,6 @@ func main() {
 	}()
 
 	for s := range serviceChan {
-		logger.Info("Services here")
 		zone.Update(s, dns)
 	}
 }

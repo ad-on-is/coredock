@@ -11,6 +11,12 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+type SRV struct {
+	Prefix string
+	Name   string
+	Port   int
+}
+
 type Service struct {
 	ID      string
 	Name    string
@@ -20,7 +26,7 @@ type Service struct {
 	Hosts   []string
 	Action  string
 	Ignore  bool
-	SRVs    map[string]int
+	SRVs    []SRV
 }
 
 func (s Service) String() string {
@@ -65,7 +71,7 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 		IPs:     ips,
 		Aliases: []string{},
 		Ignore:  false,
-		SRVs:    map[string]int{},
+		SRVs:    []SRV{},
 		Name:    cleanContainerName(c.Names[0]),
 	}
 	s = s.ParseLabels(c)
@@ -121,9 +127,13 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 				if len(split2) == 3 {
 					s.Aliases = append(s.Aliases, split2[2])
 				}
-			}
-			if port, err := strconv.Atoi(value); err == nil {
-				s.SRVs[k] = port
+				if port, err := strconv.Atoi(value); err == nil {
+					s.SRVs = append(s.SRVs, SRV{Prefix: k, Name: split2[2], Port: port})
+				}
+			} else {
+				if port, err := strconv.Atoi(value); err == nil {
+					s.SRVs = append(s.SRVs, SRV{Prefix: "_http._tcp." + s.Name, Name: s.Name, Port: port})
+				}
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -62,19 +61,23 @@ func (s *DNSProvider) GetSOARecord(domain string) dns.RR {
 	return soa
 }
 
-func (d *DNSProvider) createSRV(port int, name string) dns.RR {
+func (d *DNSProvider) createSRV(prefix string, port int, name string, domain string) dns.RR {
 	rr := new(dns.SRV)
 	ttl := d.config.TTL
 
+	if prefix == "" {
+		prefix = "_http._tcp"
+	}
+
 	rr.Hdr = dns.RR_Header{
-		Name:   name + ".",
+		Name:   prefix + "." + domain + ".",
 		Rrtype: dns.TypeSRV,
 		Class:  dns.ClassINET,
 		Ttl:    uint32(ttl),
 	}
 
 	rr.Port = uint16(port)
-	rr.Target = name
+	rr.Target = name + "." + domain + "."
 	rr.Priority = 10
 	rr.Weight = 5
 
@@ -82,16 +85,13 @@ func (d *DNSProvider) createSRV(port int, name string) dns.RR {
 }
 
 func (d *DNSProvider) GetSRVRecords(service *Service, domain string) []dns.RR {
+	rrs := []dns.RR{}
 	if len(service.SRVs) == 0 {
-		return []dns.RR{}
+		return rrs
 	}
 
-	rrs := make([]dns.RR, 0)
-
-	for _, port := range service.SRVs {
-		for _, h := range service.GetHosts(domain) {
-			rrs = append(rrs, d.createSRV(port, h))
-		}
+	for _, srv := range service.SRVs {
+		rrs = append(rrs, d.createSRV(srv.Prefix, srv.Port, service.Name, domain))
 	}
 
 	return rrs
@@ -114,26 +114,4 @@ func (d *DNSProvider) GetMXRecords(service *Service) []dns.RR {
 	}
 
 	return rrs
-}
-
-func askerInSameNet(asker string, ip string) int {
-	if asker == "127.0.0.1" {
-		return 1
-	}
-	a := strings.Split(asker, ".")
-	i := strings.Split(ip, ".")
-
-	if a[0] == i[0] && a[1] == i[1] && a[2] == i[2] {
-		return 3
-	}
-
-	if a[0] == i[0] && a[1] == i[1] {
-		return 2
-	}
-
-	if a[0] == i[0] {
-		return 1
-	}
-
-	return 0
 }
