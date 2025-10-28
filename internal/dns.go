@@ -42,7 +42,7 @@ func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 	return rrs
 }
 
-func (s *DNSProvider) GetSOARecord(service *Service, domain string) dns.RR {
+func (s *DNSProvider) GetSOARecord(domain string) dns.RR {
 	dom := dns.Fqdn(domain + ".")
 	soa := &dns.SOA{
 		Hdr: dns.RR_Header{
@@ -97,27 +97,24 @@ func (d *DNSProvider) GetSRVRecords(service *Service, domain string) []dns.RR {
 	return rrs
 }
 
-// func GetMXRecord(n string, service *Service) dns.RR {
-// 	rr := new(dns.MX)
-//
-// 	var ttl int
-// 	if service.TTL != -1 {
-// 		ttl = service.TTL
-// 	} else {
-// 		ttl = d.config.TTL
-// 	}
-//
-// 	rr.Hdr = dns.RR_Header{
-// 		Name:   n,
-// 		Rrtype: dns.TypeMX,
-// 		Class:  dns.ClassINET,
-// 		TTL:    uint32(ttl),
-// 	}
-//
-// 	rr.Mx = n
-//
-// 	return rr
-// }
+func (d *DNSProvider) GetMXRecords(service *Service) []dns.RR {
+	rrs := []dns.RR{}
+
+	ttl := d.config.TTL
+	for _, n := range service.Hosts {
+		rr := new(dns.MX)
+		rr.Hdr = dns.RR_Header{
+			Name:   n,
+			Rrtype: dns.TypeMX,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl),
+		}
+		rr.Mx = n
+		rrs = append(rrs, rr)
+	}
+
+	return rrs
+}
 
 func askerInSameNet(asker string, ip string) int {
 	if asker == "127.0.0.1" {

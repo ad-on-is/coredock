@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"sync"
 
 	"github.com/miekg/dns"
@@ -29,59 +28,29 @@ func CreateZoneDir() error {
 	// Placeholder function to match the file name.
 }
 
-func (z *ZoneHandler) getZoneFile(domain string) (string, error) {
+func (z *ZoneHandler) createZoneFile(domain string) error {
 	f := "/tmp/coredock/db." + domain
 	_, err := os.Stat(f)
 	if os.IsNotExist(err) {
 		if err := os.WriteFile(f, []byte(""), 0o644); err != nil {
-			return "", fmt.Errorf("error creating zone file for domain %s: %s", domain, err)
+			return fmt.Errorf("error creating zone file for domain %s: %s", domain, err)
 		}
-		return "", nil
 	}
-	data, err := os.ReadFile("/tmp/coredock/db." + domain)
-	if err != nil {
-		return "", fmt.Errorf("error reading zone file for domain %s: %s", domain, err)
-	}
-	return string(data), nil
+	return nil
 }
 
-func replaceWrapper(contents string, str string, start string, end string) string {
-	pattern := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`,
-		regexp.QuoteMeta(start),
-		regexp.QuoteMeta(end)))
-
-	if !pattern.MatchString(contents) {
-		contents = fmt.Sprintf("%s\n%s\n%s\n%s", contents, start, str, end)
-	} else {
-		contents = pattern.ReplaceAllStringFunc(contents, func(match string) string {
-			return fmt.Sprintf("%s\n%s\n%s", start, str, end)
-		})
-	}
-
-	return contents
-}
-
-func (z *ZoneHandler) writeZoneEntry(domain string, name string, delete bool, soa dns.RR, recordset ...[]dns.RR) error {
+func (z *ZoneHandler) writeZoneEntry(domain string, soa dns.RR, records []dns.RR) error {
 	z.mux.Lock()
 	defer z.mux.Unlock()
-	contents, err := z.getZoneFile(domain)
+	err := z.createZoneFile(domain)
 	if err != nil {
 		return err
 	}
 
-	records := ""
+	contents := fmt.Sprintf("$ORIGIN %s.\n$TTL %d\n%s\n", domain, z.config.TTL, soa.String())
 
-	if delete {
-		contents = replaceWrapper(contents, "", fmt.Sprintf("; %s BEGIN", name), fmt.Sprintf("; %s END", name))
-	} else {
-		header := fmt.Sprintf("$ORIGIN %s.\n$TTL %d\n%s\n", domain, z.config.TTL, soa.String())
-		for _, set := range recordset {
-			for _, r := range set {
-				records += r.String() + "\n"
-			}
-		}
-		contents = replaceWrapper(contents, header, "; header BEGIN", "; header END")
-		contents = replaceWrapper(contents, records, fmt.Sprintf("; %s BEGIN", name), fmt.Sprintf("; %s END", name))
+	for _, r := range records {
+		contents += r.String() + "\n"
 	}
 
 	err = os.WriteFile("/tmp/coredock/db."+domain, []byte(contents), 0o644)
@@ -91,28 +60,32 @@ func (z *ZoneHandler) writeZoneEntry(domain string, name string, delete bool, so
 	return nil
 }
 
-func (z *ZoneHandler) Create(s *Service, d *DNSProvider) {
-	if len(s.IPs) == 0 {
-		logger.Debugf("Skipping %s: No valid IP address found.", s.Name)
-		return
+func (z *ZoneHandler) Update(services *[]Service, d *DNSProvider) {
+	soas := map[string]dns.RR{}
+	records := map[string][]dns.RR{}
+	for _, s := range *services {
+
+		if len(s.IPs) == 0 {
+			logger.Warnf("Service '%s' skipped: No valid IP address found.", s.Name)
+			continue
+		}
+		for _, domain := range s.Domains {
+
+			if _, ok := soas[domain]; !ok {
+				soas[domain] = d.GetSOARecord(domain)
+			}
+
+			if _, ok := records[domain]; !ok {
+				records[domain] = []dns.RR{}
+			}
+			records[domain] = append(records[domain], d.GetARecords(&s, domain)...)
+
+			records[domain] = append(records[domain], d.GetSRVRecords(&s, domain)...)
+
+		}
+		logger.Infof("Service '%s' added with IPs: %s", s.Name, s.IPs)
 	}
-	for _, domain := range s.Domains {
-
-		soa := d.GetSOARecord(s, domain)
-
-		aRecords := d.GetARecords(s, domain)
-
-		srvRecords := d.GetSRVRecords(s, domain)
-
-		z.writeZoneEntry(domain, s.Name, false, soa, aRecords, srvRecords)
-
-	}
-	logger.Infof("Service '%s' added with IPs: %s", s.Name, s.IPs)
-}
-
-func (z *ZoneHandler) Delete(s *Service) {
-	logger.Infof("Service '%s' removed", s.Name)
-	for _, domain := range s.Domains {
-		z.writeZoneEntry(domain, s.Name, true, nil, []dns.RR{})
+	for domain, soa := range soas {
+		z.writeZoneEntry(domain, soa, records[domain])
 	}
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/ad-on-is/coredock/internal"
-	"github.com/thoas/go-funk"
 )
 
 var logger = internal.InitLogger()
@@ -16,7 +15,7 @@ func main() {
 	config := internal.NewConfig()
 
 	internal.InitLogger()
-	serviceChan := make(chan *internal.Service)
+	serviceChan := make(chan *[]internal.Service)
 	d, err := internal.NewDockerClient(serviceChan, config)
 	if err != nil {
 		panic(err)
@@ -32,15 +31,7 @@ func main() {
 	}()
 
 	for s := range serviceChan {
-		createHandler := []string{"create", "start", "connect"}
-
-		logger.Debugf("Handling container '%s': %s", s.Name, s.Action)
-
-		if funk.Contains(createHandler, s.Action) {
-			zone.Create(s, dns)
-		} else {
-			zone.Delete(s)
-		}
-
+		logger.Info("Services here")
+		zone.Update(s, dns)
 	}
 }
