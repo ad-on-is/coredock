@@ -79,7 +79,7 @@ func (z *ZoneHandler) Update(services *[]Service, d *DNSProvider) {
 				records[domain] = []dns.RR{}
 			}
 			records[domain] = append(records[domain], d.GetARecords(&s, domain)...)
-
+			records[domain] = append(records[domain], d.GetCNAMERecords(&s, domain)...)
 			records[domain] = append(records[domain], d.GetSRVRecords(&s, domain)...)
 
 		}

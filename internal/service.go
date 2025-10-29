@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -76,7 +77,10 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 	}
 	s = s.ParseLabels(c)
 
+	s.Aliases = funk.UniqString(s.Aliases)
+
 	s.Domains = append(s.Domains, conf.Domains...)
+	s.Domains = funk.UniqString(s.Domains)
 
 	for _, d := range s.Domains {
 		s.Hosts = append(s.Hosts, fmt.Sprintf("%s.%s", s.Name, d))
@@ -84,6 +88,10 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 			s.Hosts = append(s.Hosts, fmt.Sprintf("%s.%s", a, d))
 		}
 	}
+
+	s.Hosts = funk.UniqString(s.Hosts)
+
+	logger.Infof("%v", s.Aliases)
 
 	return s
 }
@@ -119,21 +127,32 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 
 		if strings.HasPrefix(key, "coredock.srv") {
 			split := strings.Split(key, "#")
-			k := ""
+			port, err := strconv.Atoi(value)
+			if err != nil {
+				continue
+			}
+			srv := SRV{Port: port}
+			if len(split) == 1 {
+				srv.Prefix = fmt.Sprintf("_http._tcp.%s", s.Name)
+				srv.Name = s.Name
+			}
 			if len(split) == 2 {
-				k = split[1]
-
-				split2 := strings.Split(split[1], ".")
-				if len(split2) == 3 {
-					s.Aliases = append(s.Aliases, split2[2])
+				name := split[1]
+				pattern := "_([a-zA-Z0-9]+)._([a-zA-Z0-9]+).(.*)"
+				re := regexp.MustCompile(pattern)
+				matches := re.FindStringSubmatch(name)
+				if len(matches) == 4 {
+					name = matches[3]
+					srv.Prefix = fmt.Sprintf("_%s._%s.%s", matches[1], matches[2], name)
+					srv.Name = matches[3]
+				} else {
+					srv.Prefix = fmt.Sprintf("_http._tcp.%s", name)
+					srv.Name = name
 				}
-				if port, err := strconv.Atoi(value); err == nil {
-					s.SRVs = append(s.SRVs, SRV{Prefix: k, Name: split2[2], Port: port})
-				}
-			} else {
-				if port, err := strconv.Atoi(value); err == nil {
-					s.SRVs = append(s.SRVs, SRV{Prefix: "_http._tcp." + s.Name, Name: s.Name, Port: port})
-				}
+			}
+			s.SRVs = append(s.SRVs, srv)
+			if srv.Name != s.Name {
+				s.Aliases = append(s.Aliases, srv.Name)
 			}
 		}
 	}
