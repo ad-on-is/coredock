@@ -62,6 +62,34 @@ func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 	return rrs
 }
 
+func (d *DNSProvider) GetPTRRecords(service *Service, domain string) []dns.RR {
+	rrs := []dns.RR{}
+
+	for _, ip := range service.IPs {
+
+		rr := new(dns.PTR)
+
+		ttl := d.config.TTL
+
+		ptrName, err := dns.ReverseAddr(ip.String())
+		if err != nil {
+			continue
+		}
+
+		rr.Hdr = dns.RR_Header{
+			Name:   ptrName,
+			Rrtype: dns.TypePTR,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl),
+		}
+		rr.Ptr = fmt.Sprintf("%s.%s.", service.Name, domain)
+
+		rrs = append(rrs, rr)
+	}
+
+	return rrs
+}
+
 func (s *DNSProvider) GetSOARecord(domain string) dns.RR {
 	dom := dns.Fqdn(domain + ".")
 	soa := &dns.SOA{

@@ -91,8 +91,6 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 
 	s.Hosts = funk.UniqString(s.Hosts)
 
-	logger.Infof("%v", s.Aliases)
-
 	return s
 }
 

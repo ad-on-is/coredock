@@ -81,6 +81,7 @@ func (z *ZoneHandler) Update(services *[]Service, d *DNSProvider) {
 			records[domain] = append(records[domain], d.GetARecords(&s, domain)...)
 			records[domain] = append(records[domain], d.GetCNAMERecords(&s, domain)...)
 			records[domain] = append(records[domain], d.GetSRVRecords(&s, domain)...)
+			records[domain] = append(records[domain], d.GetPTRRecords(&s, domain)...)
 
 		}
 		logger.Infof("Service '%s' added with IPs: %s", s.Name, s.IPs)
