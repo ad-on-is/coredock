@@ -49,7 +49,7 @@ func (d *DockerClient) Run() error {
 
 	for e := range dockerChan {
 		logger.Debugf("Received event from Docker: %v", e)
-		actions := []string{"create", "start", "stop", "connect", "disconnect", "destroy"}
+		actions := []string{"create", "connect", "disconnect", "destroy"}
 
 		if funk.Contains(actions, e.Action) {
 			d.sendContainers()

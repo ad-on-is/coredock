@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/ad-on-is/coredock/internal"
+	"github.com/thoas/go-funk"
 )
 
 var logger = internal.InitLogger()
@@ -30,7 +31,18 @@ func main() {
 		}
 	}()
 
+	previousNames := []string{}
+
 	for s := range serviceChan {
-		zone.Update(s, dns)
+		currentNames := funk.Map(*s, func(serv internal.Service) string {
+			return serv.Name
+		}).([]string)
+
+		pc, cc := funk.DifferenceString(previousNames, currentNames)
+		if len(pc) > 0 || len(cc) > 0 {
+			zone.Update(s, dns)
+			previousNames = currentNames
+		}
+
 	}
 }
