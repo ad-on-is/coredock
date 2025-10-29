@@ -91,16 +91,15 @@ func (d *DNSProvider) GetPTRRecords(service *Service, domain string) []dns.RR {
 }
 
 func (s *DNSProvider) GetSOARecord(domain string) dns.RR {
-	dom := dns.Fqdn(domain + ".")
 	soa := &dns.SOA{
 		Hdr: dns.RR_Header{
-			Name:   dom,
+			Name:   domain + ".",
 			Rrtype: dns.TypeSOA,
 			Class:  dns.ClassINET,
 			Ttl:    uint32(s.config.TTL),
 		},
-		Ns:      "coredock." + dom,
-		Mbox:    "coredock.coredock." + dom,
+		Ns:      fmt.Sprintf("coredock.%s.", domain),
+		Mbox:    fmt.Sprintf("coredock.coredock.%s.", domain),
 		Serial:  uint32(time.Now().Truncate(time.Second).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
