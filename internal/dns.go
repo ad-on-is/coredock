@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/miekg/dns"
@@ -16,26 +17,46 @@ func NewDNSProvider(c *Config) *DNSProvider {
 	}
 }
 
+func (d *DNSProvider) GetCNAMERecords(service *Service, domain string) []dns.RR {
+	rrs := []dns.RR{}
+
+	for _, alias := range service.Aliases {
+		rr := new(dns.CNAME)
+
+		ttl := d.config.TTL
+
+		rr.Hdr = dns.RR_Header{
+			Name:   fmt.Sprintf("%s.%s.", alias, domain),
+			Rrtype: dns.TypeCNAME,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl),
+		}
+		rr.Target = fmt.Sprintf("%s.%s.", service.Name, domain)
+
+		rrs = append(rrs, rr)
+	}
+
+	return rrs
+}
+
 func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 	rrs := []dns.RR{}
 
-	for _, n := range service.GetHosts(domain) {
-		for _, ip := range service.IPs {
+	for _, ip := range service.IPs {
 
-			rr := new(dns.A)
+		rr := new(dns.A)
 
-			ttl := d.config.TTL
+		ttl := d.config.TTL
 
-			rr.Hdr = dns.RR_Header{
-				Name:   n + ".",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    uint32(ttl),
-			}
-			rr.A = ip
-
-			rrs = append(rrs, rr)
+		rr.Hdr = dns.RR_Header{
+			Name:   fmt.Sprintf("%s.%s.", service.Name, domain),
+			Rrtype: dns.TypeA,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl),
 		}
+		rr.A = ip
+
+		rrs = append(rrs, rr)
 	}
 
 	return rrs
