@@ -40,9 +40,13 @@ func NewConfig() *Config {
 
 	c.TTL = ttl
 	c.Domains = funk.Filter(strings.Split(domains, ","), func(s string) bool { return s != "" }).([]string)
+	c.Domains = funk.Map(c.Domains, func(s string) string { return strings.TrimSpace(s) }).([]string)
 	c.Networks = funk.Filter(strings.Split(networks, ","), func(s string) bool { return s != "" }).([]string)
+	c.Networks = funk.Map(c.Networks, func(s string) string { return strings.TrimSpace(s) }).([]string)
 	c.IPPrefixes = funk.Filter(strings.Split(ipPrefixes, ","), func(s string) bool { return s != "" }).([]string)
+	c.IPPrefixes = funk.Map(c.IPPrefixes, func(s string) string { return strings.TrimSpace(s) }).([]string)
 	c.IPPrefixesIgnore = funk.Filter(strings.Split(ipPrefixesIgnore, ","), func(s string) bool { return s != "" }).([]string)
+	c.IPPrefixesIgnore = funk.Map(c.IPPrefixesIgnore, func(s string) string { return strings.TrimSpace(s) }).([]string)
 
 	return c
 }
