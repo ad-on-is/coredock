@@ -28,6 +28,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64, linux/arm64
           tags: |
             ghcr.io/${{ github.actor }}/coredock:${{ github.ref_name }}
             ghcr.io/${{ github.actor }}/coredock:latest

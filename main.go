@@ -2,12 +2,25 @@ package main
 
 import (
 	"github.com/ad-on-is/coredock/internal"
-	"github.com/thoas/go-funk"
 )
 
-var logger = internal.InitLogger()
+var (
+	logger  = internal.InitLogger()
+	Version string
+)
 
 func main() {
+	logger.Info(`
+=================================
+                   _         _   
+ ___ ___ ___ ___ _| |___ ___| |_ 
+|  _| . |  _| -_| . | . |  _| '_|
+|___|___|_| |___|___|___|___|_,_|
+                                
+Expose your Docker containers via DNS.
+version: ` + Version + `
+=================================
+		`)
 	err := internal.CreateZoneDir()
 	if err != nil {
 		logger.Errorf("Error initializing zone files: %s", err)
@@ -27,22 +40,12 @@ func main() {
 	go func() {
 		err := d.Run()
 		if err != nil {
-			panic(err)
+			logger.Errorf("Error running Docker client: %s", err)
+			panic(1)
 		}
 	}()
 
-	previousNames := []string{}
-
 	for s := range serviceChan {
-		currentNames := funk.Map(*s, func(serv internal.Service) string {
-			return serv.Name
-		}).([]string)
-
-		pc, cc := funk.DifferenceString(previousNames, currentNames)
-		if len(pc) > 0 || len(cc) > 0 {
-			zone.Update(s, dns)
-			previousNames = currentNames
-		}
-
+		zone.Update(s, dns)
 	}
 }
