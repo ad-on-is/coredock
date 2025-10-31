@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk --no-cache add curl coredns
+RUN apk --no-cache add curl coredns vim
 
 WORKDIR /app
 COPY entrypoint.sh .

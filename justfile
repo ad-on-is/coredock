@@ -5,5 +5,10 @@ export GOOS := "linux"
 build:
   mkdir -p build
   go build -o build/coredock
-dev:
+
+push: build
+  docker build -t ghcr.io/ad-on-is/coredock:latest .
+  docker push ghcr.io/ad-on-is/coredock:latest
+
+watch:
   watchexec -e go -r -- go run main.go

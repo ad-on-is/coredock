@@ -32,7 +32,7 @@ func NewConfig() *Config {
 	ipPrefixes := os.Getenv("COREDOCK_IP_PREFIXES")
 	ipPrefixesIgnore := os.Getenv("COREDOCK_IGNORE_IP_PREFIXES")
 	ttlStr := os.Getenv("COREDOCK_TTL")
-	ttl := 300
+	ttl := 10
 
 	if t, err := strconv.Atoi(ttlStr); err == nil {
 		ttl = t
