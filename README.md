@@ -1,8 +1,8 @@
-# coredock
+# 🧩 coredock
 
 A lightweight sidecar container that automatically exposes Docker containers as DNS entries, making container discovery and inter-container communication seamless.
 
-## Features
+## ✨ Features
 
 - Automatic DNS Registration: Exposes running Docker containers as DNS A records (e.g., containername.domain.com)
 - PTR Records: Provides reverse DNS lookups for container IP addresses
@@ -13,7 +13,7 @@ A lightweight sidecar container that automatically exposes Docker containers as 
 - Forward queries to other hosts running coredock
 - Configure containers via labels
 
-## How It Works
+### 💡 How It Works
 
 coredock monitors your Docker daemon for running containers and automatically:
 
@@ -23,21 +23,13 @@ coredock monitors your Docker daemon for running containers and automatically:
 4. Optionally connects containers to a specified network
 5. Filters published IPs based on your configured prefixes
 
-## DNS Record Examples
-
-For a container named web running on 172.17.0.2:
-
-A Record: web.docker.local → 172.17.0.2
-PTR Record: 2.0.0.10.in-addr.arpa → web.docker.local
-SRV Record: \_http.\_tcp.web.docker.local
-
-## Use Cases
+### 🌐 Use Cases
 
 - Development Environments: Eliminate hardcoded IPs in your local Docker setup
 - Service Discovery: Enable containers to find each other by name
 - Microservices: Simplify inter-service communication
 
-## Usage
+### ⚡ Installation
 
 ```yaml
 services:
@@ -47,7 +39,8 @@ services:
     container_name: coredock
     environment:
       - COREDOCK_DOMAINS=docker.lan
-      - COREDOCK_IP_PREFIXES=10,192 # (optional) only expose A records for these IP prefixes
+      - COREDOCK_IP_PREFIXES=10,192 # [either] (recommended) only expose A records for these IP prefixes
+      - COREDOCK_IGNORE_IP_PREFIXES=172 # [or] (recommended) ignore these IP prefixes
       - COREDOCK_NETWORKS=vlan40,vlan10 # (optional) auto-connect containers to these networks
       - COREDOCK_NAMESERVERS=10.0.0.2:53 # (optional) other coredock hosts
     volumes:
@@ -57,7 +50,7 @@ services:
       - 53:53/udp
 ```
 
-## Container labels
+### 🐳 Usage in containers
 
 ```yaml
 services:
@@ -78,7 +71,7 @@ services:
       coredock.alias: my-alias
 ```
 
-### DNS Queries
+### 🔍 DNS Queries
 
 ```bash
 dig app.docker.lan
