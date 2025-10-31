@@ -121,7 +121,9 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 
 		isCoredock := strings.Contains(c.Image, "coredock")
 
-		return !isIgnored && !isCoredock
+		isRunning := c.State == "running"
+
+		return !isIgnored && !isCoredock && isRunning
 	}).([]docker.APIContainers), nil
 }
 
