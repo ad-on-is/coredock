@@ -13,6 +13,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.25
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.67.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: minor
       - name: Get package version
         id: package-version
         run: |
@@ -33,7 +38,7 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/amd64, linux/arm64
+          # platforms: linux/amd64, linux/arm64
           tags: |
             ghcr.io/${{ github.actor }}/coredock:latest
             ghcr.io/${{ github.actor }}/coredock:v${{ steps.package-version.outputs.VERSION }}
