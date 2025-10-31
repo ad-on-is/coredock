@@ -18,6 +18,7 @@ type DockerClient struct {
 	config        *Config
 	previousNames []string
 	currentNames  []string
+	mux           sync.Mutex
 }
 
 func NewDockerClient(channel chan *[]Service, conf *Config) (*DockerClient, error) {
@@ -25,10 +26,11 @@ func NewDockerClient(channel chan *[]Service, conf *Config) (*DockerClient, erro
 	if err != nil {
 		return nil, err
 	}
-	return &DockerClient{client: client, channel: channel, config: conf, previousNames: []string{}, currentNames: []string{}}, nil
+	return &DockerClient{client: client, channel: channel, config: conf, previousNames: []string{}, currentNames: []string{}, mux: sync.Mutex{}}, nil
 }
 
 func (d *DockerClient) sendContainers() {
+	d.mux.Lock()
 	containers, err := d.getContainers()
 	if err != nil {
 		return
@@ -55,6 +57,7 @@ func (d *DockerClient) sendContainers() {
 		d.previousNames = d.currentNames
 		d.channel <- &services
 	}
+	d.mux.Unlock()
 }
 
 func debounce(fn func(), delay time.Duration) func() {
@@ -77,6 +80,13 @@ func (d *DockerClient) Run() error {
 	dockerChan := make(chan *docker.APIEvents)
 
 	d.sendContainers()
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			d.sendContainers()
+		}
+	}()
 
 	err := d.client.AddEventListener(dockerChan)
 	if err != nil {
