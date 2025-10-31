@@ -105,7 +105,7 @@ dig -x 10.0.0.2
 
 #### Example scenario: Caddyfile
 
-Automatically proxy all requrests `<name>.example.com` to `<name>.docker.lan` and their corresponding SRV port.
+Automatically proxy all requests `<name>.example.com` to `<name>.docker.lan` and their corresponding SRV port.
 
 ```Caddyfile
 example.com {

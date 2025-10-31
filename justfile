@@ -9,7 +9,7 @@ run:
 
 build:
   mkdir -p build
-  go build -o build/coredock
+  go build -ldflags '-X main.Version={{version}}' -o build/coredock
 
 push: build
   docker build -t ghcr.io/ad-on-is/coredock:latest .
