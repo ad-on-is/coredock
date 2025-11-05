@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION
@@ -7,8 +7,7 @@ WORKDIR /build
 COPY . .
 
 
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-  go build -ldflags "-X main.Version=${VERSION}" -o coredock .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-X main.Version=${VERSION}" -o coredock .
 
 FROM alpine:latest
 

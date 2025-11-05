@@ -8,8 +8,7 @@ run:
   go run -ldflags '-X main.Version={{version}}' main.go
 
 build:
-  mkdir -p build
-  go build -ldflags '-X main.Version={{version}}' -o build/coredock
+  docker build -t ghcr.io/ad-on-is/coredock .
 
 push: build
   docker build -t ghcr.io/ad-on-is/coredock:latest .
