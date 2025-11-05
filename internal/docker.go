@@ -17,7 +17,6 @@ type DockerClient struct {
 	channel       chan *[]Service
 	config        *Config
 	previousNames []string
-	currentNames  []string
 	mux           sync.Mutex
 }
 
@@ -26,7 +25,7 @@ func NewDockerClient(channel chan *[]Service, conf *Config) (*DockerClient, erro
 	if err != nil {
 		return nil, err
 	}
-	return &DockerClient{client: client, channel: channel, config: conf, previousNames: []string{}, currentNames: []string{}, mux: sync.Mutex{}}, nil
+	return &DockerClient{client: client, channel: channel, config: conf, previousNames: []string{}, mux: sync.Mutex{}}, nil
 }
 
 func (d *DockerClient) sendContainers() {
@@ -42,19 +41,26 @@ func (d *DockerClient) sendContainers() {
 		services = append(services, *NewService(&c, "start", d.config))
 	}
 
-	d.currentNames = funk.Map(services, func(s Service) string {
+	currentNames := funk.Map(services, func(s Service) string {
 		sort.Slice(s.IPs, func(i, j int) bool {
 			return bytes.Compare(s.IPs[i], s.IPs[j]) < 0
 		})
 		return fmt.Sprintf("%s%v", s.Name, s.IPs)
 	}).([]string)
 
-	sort.Strings(d.currentNames)
+	sort.Strings(currentNames)
 
-	pc, cc := funk.DifferenceString(d.previousNames, d.currentNames)
+	pc, cc := funk.DifferenceString(d.previousNames, currentNames)
+
+	if len(pc) > 0 {
+		logger.Infof("Detected changed containers: %v", pc)
+	}
+	if len(cc) > 0 {
+		logger.Infof("Detected changed containers: %v", cc)
+	}
 
 	if len(pc) > 0 || len(cc) > 0 {
-		d.previousNames = d.currentNames
+		d.previousNames = currentNames
 		d.channel <- &services
 	}
 	d.mux.Unlock()

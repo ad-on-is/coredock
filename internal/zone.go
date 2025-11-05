@@ -106,7 +106,7 @@ func (z *ZoneHandler) Update(services *[]Service, d *DNSProvider) {
 
 			}
 		}
-		logger.Infof("Service '%s' added with IPs: %s", s.Name, s.IPs)
+		logger.Debugf("Service '%s' added with IPs: %s", s.Name, s.IPs)
 	}
 	for domain, soa := range soas {
 		if err := z.writeZoneEntry(domain, soa, records[domain]); err != nil {
