@@ -26,7 +26,6 @@ jobs:
         run: |
           mkdir build
           go build -ldflags '-X main.Version=${{ steps.package-version.outputs.VERSION }}' -o build/coredock
-          ls build
       - name: Docker Login
         uses: docker/login-action@v3
         with:
