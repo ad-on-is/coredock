@@ -24,7 +24,9 @@ jobs:
           echo "VERSION=$(git describe --tags --always 2>/dev/null)" >> $GITHUB_OUTPUT
       - name: Build
         run: |
-          mkdir build && go build -ldflags '-X main.Version=${{ steps.package-version.outputs.VERSION }}' -o build/coredock
+          mkdir build
+          go build -ldflags '-X main.Version=${{ steps.package-version.outputs.VERSION }}' -o build/coredock
+          ls build
       - name: Docker Login
         uses: docker/login-action@v3
         with:
