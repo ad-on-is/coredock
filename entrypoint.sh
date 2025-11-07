@@ -8,7 +8,7 @@ NAMESERVERS=${COREDOCK_NAMESERVERS:-""}
 nameservers="${NAMESERVERS//,/ }"
 forward=""
 
-forward="forward . 127.0.0.1:5311"
+forward="fanout . 127.0.0.1:5311"
 if [ -n "$nameservers" ]; then
     forward="${forward} ${nameservers}"
 fi
@@ -32,6 +32,6 @@ corefileforward="
 
 echo "$corefile" > /tmp/coredock/Corefile
 echo "$corefileforward" > /tmp/coredock/Corefile.forward
-coredns -dns.port 5311 -p 5311 --conf /tmp/coredock/Corefile &
-coredns --conf /tmp/coredock/Corefile.forward &
+./coredns -dns.port 5311 -p 5311 --conf /tmp/coredock/Corefile &
+./coredns --conf /tmp/coredock/Corefile.forward &
 ./coredock
