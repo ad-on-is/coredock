@@ -50,6 +50,17 @@ services:
       - 53:53/udp
 ```
 
+#### Settings
+
+- COREDOCK_DOMAINS: comma separated list of domains to be exposed. (defaults to 'docker')
+- COREDOCK_IP_PREFIXES: Containers usually have multliple IPs when assigned to multiple internal/external networks. Tell coredock to only
+  use these IP prefixes. Comma separated list (i.e 10.10,192.10)
+- COREDOCK_IGNORE_IP_PREFIXES: Same as above, but tell coredock to ignore these prefixes. Comma separated list (i.e. 172)
+- COREDOCK_NETWORKS: Automatically assign new containers to these networks. The networks must exist prior to assigning them. Comma separated
+  list (i.e. vlan40,br0.20)
+- COREDOCK_NAMESERVERS: Forward queries to other nameservers. This is usesfull, if you want one main coredock service to query other
+  coredock services on different hosts. Comma separated list (i.e 10.10.10.11:53)
+
 ### 🐳 Usage in containers
 
 ```yaml
