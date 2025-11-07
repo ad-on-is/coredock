@@ -35,7 +35,9 @@ jobs:
         with:
           context: .
           push: true
-          platforms: linux/amd64
+          build-args: |
+            VERSION=${{ steps.package-version.outputs.VERSION }}
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.actor }}/coredock:latest
             ghcr.io/${{ github.actor }}/coredock:v${{ steps.package-version.outputs.VERSION }}
