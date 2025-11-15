@@ -8,7 +8,10 @@ NAMESERVERS=${COREDOCK_NAMESERVERS:-""}
 nameservers="${NAMESERVERS//,/ }"
 forward=""
 
-forward="fanout . 127.0.0.1:5311"
+forward="fanout . 127.0.0.1:5311 {
+  attempt-count 1
+  timeout 1s
+}"
 if [ -n "$nameservers" ]; then
     forward="${forward} ${nameservers}"
 fi
