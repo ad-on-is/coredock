@@ -10,10 +10,7 @@ forward=""
 
 forward="fanout . 127.0.0.1:5311"
 if [ -n "$nameservers" ]; then
-    forward="${forward} ${nameservers} {
-    attempt-count 1
-    timeout 1s
-}"
+    forward="${forward} ${nameservers}"
 fi
 
 
@@ -29,7 +26,10 @@ corefile="
 
 corefileforward="
 . {
-    ${forward}
+    ${forward} {
+    attempt-count 1
+    timeout 1s
+  }
 }
 "
 
