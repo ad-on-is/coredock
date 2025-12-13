@@ -77,8 +77,8 @@ services:
     restart: always
     labels:
       coredock.srv: 80 # will create _http._tcp.app.domain.com SRV record
-      coredock.srv#api: 3000 # will create _http._tcp.api.domain.com SRV record
-      coredock.srv#_http._tcp.websocket: 6000 # will create _http._tcp.websocket.domain.com SRV record
+      coredock.srv--api: 3000 # will create _http._tcp.api.domain.com SRV record
+      coredock.srv--_http._tcp.websocket: 6000 # will create _http._tcp.websocket.domain.com SRV record
       coredock.alias: my-alias
 ```
 
@@ -86,9 +86,9 @@ services:
 
 - `coredock.ignore: true` - Ignores the container
 - `coredock.srv: 3000` - Creates an SRV record with `_http._tcp.containername` pointing to port 3000
-- `coredock.srv#alias: 3000` Creates an SRV record with `_http._tcp.alias` pointing to port 3000. Useful when containers come with a
+- `coredock.srv--alias: 3000` Creates an SRV record with `_http._tcp.alias` pointing to port 3000. Useful when containers come with a
   backend-service and a frontend-service running on different ports.
-- `coredock.srv#_<service>._<proto>.alias: 3000` - Allows you to specify custom service and protocol for the SRV record.
+- `coredock.srv--_<service>._<proto>.alias: 3000` - Allows you to specify custom service and protocol for the SRV record.
 - `coredock.alias: foo,bar` - Comma separated list to create CNAME records of the service.
 
 ### 🔍 DNS Queries

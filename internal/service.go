@@ -124,7 +124,7 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 		}
 
 		if strings.HasPrefix(key, "coredock.srv") {
-			split := strings.Split(key, "_")
+			split := strings.Split(key, "--")
 			port, err := strconv.Atoi(value)
 			if err != nil {
 				continue
