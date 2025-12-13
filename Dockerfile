@@ -28,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-X ma
 
 FROM alpine:latest
 
-RUN apk --no-cache add curl coredns vim
+RUN apk --no-cache add curl coredns
 
 WORKDIR /app
 COPY entrypoint.sh .
