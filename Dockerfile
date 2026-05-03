@@ -1,19 +1,5 @@
-FROM golang:1.21-alpine AS corednsbuilder
-ARG TARGETOS
-ARG TARGETARCH
-
-RUN apk add --no-cache git make
-
-WORKDIR /coredns
-
-RUN git clone https://github.com/coredns/coredns.git . && \
-  git checkout v1.11.1
-
-RUN echo "fanout:github.com/networkservicemesh/fanout" >> plugin.cfg
-
-RUN go generate
-RUN go mod tidy
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}  make
+ARG COREDNS_IMAGE
+FROM ${COREDNS_IMAGE} AS corednsbuilder
 
 FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS coredockbuilder
 ARG TARGETOS
@@ -23,8 +9,9 @@ ARG VERSION
 WORKDIR /build
 COPY . .
 
-
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-X main.Version=${VERSION}" -o coredock .
+RUN --mount=type=cache,target=/go/pkg/mod,id=coredock-gomod \
+    --mount=type=cache,target=/root/.cache/go-build,id=coredock-gobuild-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-X main.Version=${VERSION}" -o coredock .
 
 FROM alpine:latest
 
@@ -32,8 +19,8 @@ RUN apk --no-cache add curl coredns
 
 WORKDIR /app
 COPY entrypoint.sh .
-COPY --from=corednsbuilder coredns/coredns .
-COPY --from=coredockbuilder build/coredock .
+COPY --from=corednsbuilder /coredns/coredns .
+COPY --from=coredockbuilder /build/coredock .
 
 RUN chmod +x entrypoint.sh coredock
 ENTRYPOINT ["./entrypoint.sh"]

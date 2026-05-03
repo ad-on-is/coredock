@@ -1,0 +1,37 @@
+name: Build CoreDNS
+on:
+  push:
+    paths:
+      - Dockerfile.coredns
+  workflow_dispatch:
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Builder
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push CoreDNS image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.coredns
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/${{ github.repository_owner }}/coredns-fanout:v1.11.1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

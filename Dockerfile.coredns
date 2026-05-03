@@ -1,0 +1,23 @@
+FROM golang:1.21-alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN apk add --no-cache git make
+
+WORKDIR /coredns
+
+RUN git clone https://github.com/coredns/coredns.git . && \
+  git checkout v1.11.1
+
+RUN echo "fanout:github.com/networkservicemesh/fanout" >> plugin.cfg
+
+RUN --mount=type=cache,target=/go/pkg/mod,id=coredns-gomod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=coredns-gobuild-${TARGETARCH} \
+    go generate && go mod tidy
+
+RUN --mount=type=cache,target=/go/pkg/mod,id=coredns-gomod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=coredns-gobuild-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} make
+
+FROM scratch
+COPY --from=builder /coredns/coredns /coredns/coredns

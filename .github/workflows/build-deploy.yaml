@@ -45,7 +45,10 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ steps.package-version.outputs.VERSION }}
+            COREDNS_IMAGE=ghcr.io/${{ github.repository_owner }}/coredns-fanout:v1.11.1
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.actor }}/coredock:latest
             ghcr.io/${{ github.actor }}/coredock:v${{ steps.package-version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
