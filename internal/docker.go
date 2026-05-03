@@ -2,7 +2,12 @@ package internal
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -133,6 +138,43 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 	}).([]docker.APIContainers), nil
 }
 
+func (d *DockerClient) connectWithPriority(networkID, containerID string, priority int) error {
+	payload, _ := json.Marshal(map[string]any{
+		"Container": containerID,
+		"EndpointConfig": map[string]any{
+			"GwPriority": priority,
+		},
+	})
+
+	httpc := http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", "/var/run/docker.sock")
+			},
+		},
+	}
+
+	resp, err := httpc.Post(
+		fmt.Sprintf("http://localhost/networks/%s/connect", networkID),
+		"application/json",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 403 {
+		// already connected
+		return nil
+	}
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("docker API error: %s", string(body))
+	}
+	return nil
+}
+
 func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 	for _, nw := range d.config.Networks {
 		dnw, err := d.findNetwork(nw)
@@ -141,7 +183,13 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 			continue
 		}
 		logger.Debugf("Connected '%s' to network '%s'", cleanContainerName(c.Names[0]), dnw.Name)
-		err = d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+		if dnw.Driver == "macvlan" {
+			err = d.connectWithPriority(dnw.ID, c.ID, 9999)
+		} else {
+			err = d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+		}
+		// err = d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
 			logger.Errorf("Error connecting container '%s' to network '%s': %v", cleanContainerName(c.Names[0]), dnw.Name, err)
 		}
