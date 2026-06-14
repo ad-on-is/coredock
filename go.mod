@@ -9,6 +9,7 @@ require (
 	github.com/golang-queue/queue v0.4.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
+	go.etcd.io/bbolt v1.4.3 // indirect
 )
 
 require (

@@ -20,17 +20,18 @@ import (
 type DockerClient struct {
 	client        *docker.Client
 	channel       chan *[]Service
+	db            *DB
 	config        *Config
 	previousNames []string
 	mux           sync.Mutex
 }
 
-func NewDockerClient(channel chan *[]Service, conf *Config) (*DockerClient, error) {
+func NewDockerClient(channel chan *[]Service, conf *Config, db *DB) (*DockerClient, error) {
 	client, err := docker.NewClientFromEnv()
 	if err != nil {
 		return nil, err
 	}
-	return &DockerClient{client: client, channel: channel, config: conf, previousNames: []string{}, mux: sync.Mutex{}}, nil
+	return &DockerClient{client: client, channel: channel, config: conf, db: db, previousNames: []string{}, mux: sync.Mutex{}}, nil
 }
 
 func (d *DockerClient) sendContainers() {
@@ -138,13 +139,23 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 	}).([]docker.APIContainers), nil
 }
 
-func (d *DockerClient) connectWithPriority(networkID, containerID string, priority int) error {
-	payload, _ := json.Marshal(map[string]any{
+func (d *DockerClient) connectWithPriority(networkID, containerID string, priority int, containerIP string) error {
+
+	pl := map[string]any{
 		"Container": containerID,
 		"EndpointConfig": map[string]any{
 			"GwPriority": priority,
+			"IPAMConfig": map[string]any{
+				"IPv4Address": containerIP,
+			},
 		},
-	})
+	}
+
+	if containerIP != "" {
+		delete(pl["EndpointConfig"].(map[string]any), "IPAMConfig")
+	}
+
+	payload, _ := json.Marshal(pl)
 
 	httpc := http.Client{
 		Transport: &http.Transport{
@@ -175,25 +186,107 @@ func (d *DockerClient) connectWithPriority(networkID, containerID string, priori
 	return nil
 }
 
+func (d *DockerClient) isIPAssignedOnNetwork(networkName, ip string) (bool, string) {
+	containers, err := d.client.ListContainers(docker.ListContainersOptions{All: false})
+	if err != nil {
+		return false, ""
+	}
+	for _, c := range containers {
+		for nwName, nw := range c.Networks.Networks {
+			if nwName == networkName && nw.IPAddress == ip {
+				return true, cleanContainerName(c.Names[0])
+			}
+		}
+	}
+	return false, ""
+}
+
 func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
+	containerName := cleanContainerName(c.Names[0])
 	for _, nw := range d.config.Networks {
+
 		dnw, err := d.findNetwork(nw)
 		if err != nil {
 			logger.Errorf("Error finding network '%s': %v", nw, err)
 			continue
 		}
-		logger.Debugf("Connected '%s' to network '%s'", cleanContainerName(c.Names[0]), dnw.Name)
-		if dnw.Driver == "macvlan" {
-			err = d.connectWithPriority(dnw.ID, c.ID, 9999)
-		} else {
-			err = d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+
+		dbKey := fmt.Sprintf("%s-%s", containerName, dnw.Name)
+		containerIp := ""
+
+		if d.config.ReuseIPs {
+
+			containerIp = d.db.Get(dbKey)
+			logger.Debugf("container ip: %s", containerIp)
+			assigned, assignedTo := d.isIPAssignedOnNetwork(dnw.Name, containerIp)
+			if containerIp != "" {
+				if assigned && containerName != assignedTo {
+					containerIp = ""
+				} else {
+					logger.Infof("Found saved IP '%s' for '%s'", containerIp, containerName)
+				}
+			}
 		}
-		// err = d.client.ConnectNetwork(dnw.ID, docker.NetworkConnectionOptions{Container: c.ID})
+
+		logger.Debugf("Connected '%s' to network '%s'", containerName, dnw.Name)
+		if dnw.Driver == "macvlan" {
+			err = d.connectWithPriority(dnw.ID, c.ID, 9999, containerIp)
+		} else {
+			opts := docker.NetworkConnectionOptions{
+				Container: c.ID,
+			}
+			if containerIp != "" {
+				opts.EndpointConfig = &docker.EndpointConfig{
+
+					IPAMConfig: &docker.EndpointIPAMConfig{
+						IPv4Address: containerIp,
+					},
+				}
+			}
+			err = d.client.ConnectNetwork(dnw.ID, opts)
+
+		}
 
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
 			logger.Errorf("Error connecting container '%s' to network '%s': %v", cleanContainerName(c.Names[0]), dnw.Name, err)
+		} else {
+			d.saveIp(c, dnw)
 		}
 	}
+
+}
+
+func (d *DockerClient) saveIp(c *docker.APIContainers, dnw *docker.Network) {
+	containerName := cleanContainerName(c.Names[0])
+	dbKey := fmt.Sprintf("%s-%s", containerName, dnw.Name)
+	inspected, err := d.client.InspectContainerWithOptions(docker.InspectContainerOptions{
+		ID: c.ID,
+	})
+
+	if err != nil {
+		logger.Errorf("Error inspecting container '%s': %v", containerName, err)
+		return
+	}
+
+	for name, ep := range inspected.NetworkSettings.Networks {
+		if name == dnw.Name {
+			ip := ep.IPAddress
+			d.db.Set(dbKey, ip)
+		}
+	}
+}
+
+func (d *DockerClient) getContainerIPs(c *docker.APIContainers, network string) net.IP {
+	for _, netw := range c.Networks.Networks {
+		if network != "" && netw.NetworkID != network {
+			continue
+		}
+		ip := net.ParseIP(netw.IPAddress)
+		if ip != nil {
+			return ip
+		}
+	}
+	return nil
 }
 
 func (d *DockerClient) findNetwork(name string) (*docker.Network, error) {

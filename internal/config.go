@@ -14,6 +14,7 @@ type Config struct {
 	TTL              int
 	IPPrefixes       []string
 	IPPrefixesIgnore []string
+	ReuseIPs         bool
 }
 
 func NewConfig() *Config {
@@ -22,6 +23,7 @@ func NewConfig() *Config {
 		Networks:   []string{},
 		TTL:        300,
 		IPPrefixes: []string{},
+		ReuseIPs:   false,
 	}
 
 	domains := os.Getenv("COREDOCK_DOMAINS")
@@ -30,6 +32,7 @@ func NewConfig() *Config {
 	}
 	networks := os.Getenv("COREDOCK_NETWORKS")
 	ipPrefixes := os.Getenv("COREDOCK_IP_PREFIXES")
+	saveIps := os.Getenv("COREDOCK_REUSE_IPS") == "true"
 	ipPrefixesIgnore := os.Getenv("COREDOCK_IGNORE_IP_PREFIXES")
 	ttlStr := os.Getenv("COREDOCK_TTL")
 	ttl := 10
@@ -39,6 +42,7 @@ func NewConfig() *Config {
 	}
 
 	c.TTL = ttl
+	c.ReuseIPs = saveIps
 	c.Domains = funk.Filter(strings.Split(domains, ","), func(s string) bool { return s != "" }).([]string)
 	c.Domains = funk.Map(c.Domains, func(s string) string { return strings.TrimSpace(s) }).([]string)
 	c.Networks = funk.Filter(strings.Split(networks, ","), func(s string) bool { return s != "" }).([]string)

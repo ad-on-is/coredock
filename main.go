@@ -12,11 +12,11 @@ var (
 func main() {
 	logger.Info(`
 =================================
-                   _         _   
- ___ ___ ___ ___ _| |___ ___| |_ 
+                   _         _
+ ___ ___ ___ ___ _| |___ ___| |_
 |  _| . |  _| -_| . | . |  _| '_|
 |___|___|_| |___|___|___|___|_,_|
-                                
+
 Expose your Docker containers via DNS.
 version: ` + Version + `
 =================================
@@ -30,7 +30,8 @@ version: ` + Version + `
 
 	internal.InitLogger()
 	serviceChan := make(chan *[]internal.Service)
-	d, err := internal.NewDockerClient(serviceChan, config)
+	db := internal.NewDB()
+	d, err := internal.NewDockerClient(serviceChan, config, db)
 	if err != nil {
 		panic(err)
 	}
