@@ -7,7 +7,7 @@ RUN apk add --no-cache git make
 WORKDIR /coredns
 
 RUN git clone https://github.com/coredns/coredns.git . && \
-  git checkout v1.11.1
+  git checkout v1.14.4
 
 RUN echo "fanout:github.com/networkservicemesh/fanout" >> plugin.cfg
 
