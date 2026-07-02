@@ -27,8 +27,8 @@ corefile="
 corefileforward="
 . {
     ${forward} {
-    attempt-count 1
-    timeout 1s
+    attempt-count 3
+    timeout 2s
     network TCP
   }
 }
