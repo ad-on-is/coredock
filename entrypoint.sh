@@ -26,10 +26,11 @@ corefile="
 
 corefileforward="
 . {
+    log
     ${forward} {
-    attempt-count 3
-    timeout 2s
-    network TCP
+      attempt-count 3
+      timeout 2s
+      network TCP
   }
 }
 "
