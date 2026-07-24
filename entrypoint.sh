@@ -6,11 +6,11 @@ mkdir -p /tmp/coredock
 NAMESERVERS=${COREDOCK_NAMESERVERS:-""}
 
 nameservers="${NAMESERVERS//,/ }"
-forward=""
+fanout=""
 
-forward="fanout . 127.0.0.1:5311"
+fanout="fanout . 127.0.0.1:5311"
 if [ -n "$nameservers" ]; then
-    forward="fanout . ${nameservers}"
+    fanout="fanout . ${nameservers}"
 fi
 
 
@@ -27,10 +27,8 @@ corefile="
 corefileforward="
 . {
     log
-    ${forward} {
-      attempt-count 3
-      timeout 2s
-      network TCP
+    ${fanout} {
+      timeout 3s
   }
 }
 "
