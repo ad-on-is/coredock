@@ -39,30 +39,35 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 	ips := []net.IP{}
 	for _, netw := range c.Networks.Networks {
 		ip := net.ParseIP(netw.IPAddress)
-		if ip != nil {
+		ipv6 := net.ParseIP(netw.GlobalIPv6Address)
+		if ip == nil && ipv6 == nil {
+			continue
+		}
 
-			foundPrefix := false
-			ignorePrefix := false
+		foundPrefix := false
+		ignorePrefix := false
 
-			for _, p := range conf.IPPrefixes {
-				if strings.HasPrefix(ip.String(), p) {
-					foundPrefix = true
-					break
-				}
+		for _, p := range conf.IPPrefixes {
+			if strings.HasPrefix(ip.String(), p) || ipv6 != nil && strings.HasPrefix(ipv6.String(), p) {
+				foundPrefix = true
+				break
 			}
+		}
 
-			for _, p := range conf.IPPrefixesIgnore {
-				if strings.HasPrefix(ip.String(), p) {
+		for _, p := range conf.IPPrefixesIgnore {
+			if strings.HasPrefix(ip.String(), p) || ipv6 != nil && strings.HasPrefix(ipv6.String(), p) {
 
-					ignorePrefix = true
-					break
-				}
+				ignorePrefix = true
+				break
 			}
-			if !foundPrefix && len(conf.IPPrefixes) > 0 || ignorePrefix && len(conf.IPPrefixesIgnore) > 0 {
-				continue
-			}
+		}
+		if !foundPrefix && len(conf.IPPrefixes) > 0 || ignorePrefix && len(conf.IPPrefixesIgnore) > 0 {
+			continue
+		}
 
-			ips = append(ips, ip)
+		ips = append(ips, ip)
+		if ipv6 != nil {
+			ips = append(ips, ipv6)
 		}
 	}
 

@@ -10,7 +10,9 @@ var (
 )
 
 func main() {
-	logger.Info(`
+	config := internal.NewConfig()
+
+	logger.Infof(`
 =================================
                    _         _
  ___ ___ ___ ___ _| |___ ___| |_
@@ -18,15 +20,18 @@ func main() {
 |___|___|_| |___|___|___|___|_,_|
 
 Expose your Docker containers via DNS.
-version: ` + Version + `
+Version: %s
+
+Domains: %v
+IP-Prefixes: %v
+Networks: %v
 =================================
-		`)
+		`, Version, config.Domains, config.IPPrefixes, config.Networks)
 	err := internal.CreateZoneDir()
 	if err != nil {
 		logger.Errorf("Error initializing zone files: %s", err)
 		panic(1)
 	}
-	config := internal.NewConfig()
 
 	internal.InitLogger()
 	serviceChan := make(chan *[]internal.Service)
