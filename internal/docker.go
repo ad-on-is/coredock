@@ -201,11 +201,25 @@ func (d *DockerClient) isIPAssignedOnNetwork(networkName, ip string) (bool, stri
 	return false, ""
 }
 
+func (d *DockerClient) isConnectedToNetwork(c *docker.APIContainers, networkID string) bool {
+	for _, nw := range c.Networks.Networks {
+		if nw.NetworkID == networkID {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 	containerName := cleanContainerName(c.Names[0])
 	for _, nw := range d.config.Networks {
 
 		dnw, err := d.findNetwork(nw)
+		if d.isConnectedToNetwork(c, dnw.ID) {
+			logger.Debugf("Container '%s' already connected to network '%s'", containerName, dnw.Name)
+			d.saveIp(c, dnw)
+			continue
+		}
 		if err != nil {
 			logger.Errorf("Error finding network '%s': %v", nw, err)
 			continue
@@ -247,10 +261,8 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 
 		}
 
-		if err != nil && !strings.Contains(err.Error(), "already exists") {
+		if err != nil {
 			logger.Errorf("Error connecting container '%s' to %s network '%s': %v", cleanContainerName(c.Names[0]), dnw.Driver, dnw.Name, err)
-		} else {
-			d.saveIp(c, dnw)
 		}
 	}
 
