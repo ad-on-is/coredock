@@ -248,7 +248,7 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 		}
 
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
-			logger.Errorf("Error connecting container '%s' to network '%s': %v", cleanContainerName(c.Names[0]), dnw.Name, err)
+			logger.Errorf("Error connecting container '%s' to %s network '%s': %v", cleanContainerName(c.Names[0]), dnw.Driver, dnw.Name, err)
 		} else {
 			d.saveIp(c, dnw)
 		}
