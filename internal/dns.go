@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -44,6 +45,10 @@ func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 
 	for _, ip := range service.IPs {
 
+		if !strings.Contains(ip.String(), ".") {
+			continue
+		}
+
 		rr := new(dns.A)
 
 		ttl := d.config.TTL
@@ -55,6 +60,33 @@ func (d *DNSProvider) GetARecords(service *Service, domain string) []dns.RR {
 			Ttl:    uint32(ttl),
 		}
 		rr.A = ip
+
+		rrs = append(rrs, rr)
+	}
+
+	return rrs
+}
+
+func (d *DNSProvider) GetAAAARecords(service *Service, domain string) []dns.RR {
+	rrs := []dns.RR{}
+
+	for _, ip := range service.IPs {
+
+		if !strings.Contains(ip.String(), ":") {
+			continue
+		}
+
+		rr := new(dns.AAAA)
+
+		ttl := d.config.TTL
+
+		rr.Hdr = dns.RR_Header{
+			Name:   fmt.Sprintf("%s.%s.", service.Name, domain),
+			Rrtype: dns.TypeAAAA,
+			Class:  dns.ClassINET,
+			Ttl:    uint32(ttl),
+		}
+		rr.AAAA = ip
 
 		rrs = append(rrs, rr)
 	}

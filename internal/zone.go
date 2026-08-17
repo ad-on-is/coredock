@@ -81,15 +81,26 @@ func (z *ZoneHandler) Update(services *[]Service, d *DNSProvider) {
 				records[domain] = []dns.RR{}
 			}
 			records[domain] = append(records[domain], d.GetARecords(&s, domain)...)
+			records[domain] = append(records[domain], d.GetAAAARecords(&s, domain)...)
 			records[domain] = append(records[domain], d.GetCNAMERecords(&s, domain)...)
 			records[domain] = append(records[domain], d.GetSRVRecords(&s, domain)...)
 
 			for _, ip := range s.IPs {
 				ipstr := ip.String()
+				if !strings.Contains(ipstr, ".") {
+					continue
+				}
 				split := strings.Split(ipstr, ".")
-				zone1 := fmt.Sprintf("%s.in-addr.arpa", split[0])
-				zone2 := fmt.Sprintf("%s.%s.in-addr.arpa", split[1], split[0])
-				zone3 := fmt.Sprintf("%s.%s.%s.in-addr.arpa", split[2], split[1], split[0])
+				arpa := "in-addr"
+				// add ipv6
+				// if strings.Contains(ipstr, ":") {
+				// 	ipstr2 := strings.Replace(ipstr, ":", "", -1)
+				// 	split = strings.Split(ipstr2, "")
+				// 	arpa = "ip6"
+				// }
+				zone1 := fmt.Sprintf("%s.%s.arpa", split[0], arpa)
+				zone2 := fmt.Sprintf("%s.%s.%s.arpa", split[1], split[0], arpa)
+				zone3 := fmt.Sprintf("%s.%s.%s.%s.arpa", split[2], split[1], split[0], arpa)
 				if _, ok := reverseRecords[zone1]; !ok {
 					reverseRecords[zone1] = []dns.RR{}
 				}
