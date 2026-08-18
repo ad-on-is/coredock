@@ -242,7 +242,6 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 			}
 		}
 
-		logger.Debugf("Connected '%s' to network '%s'", containerName, dnw.Name)
 		if dnw.Driver == "macvlan" {
 			err = d.connectWithPriority(dnw.ID, c.ID, 9999, containerIp)
 		} else {
@@ -263,6 +262,8 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 
 		if err != nil {
 			logger.Errorf("Error connecting container '%s' to %s network '%s': %v", cleanContainerName(c.Names[0]), dnw.Driver, dnw.Name, err)
+		} else {
+			logger.Debugf("Connected '%s' to network '%s'", containerName, dnw.Name)
 		}
 	}
 
