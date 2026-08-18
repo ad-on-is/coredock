@@ -159,12 +159,12 @@ func (d *DockerClient) connectWithPriority(networkID, containerID string, ipv4, 
 		ep["IPAMConfig"] = ipamConfig
 	}
 
-	ep["DriverOpts"] = map[string]any{
-		"com.docker.network.endpoint.sysctls": "net.ipv6.conf.IFNAME.accept_ra=0",
-	}
-
 	payload, _ := json.Marshal(pl)
 
+	return d.postNetworkConnect(networkID, payload)
+}
+
+func (d *DockerClient) postNetworkConnect(networkID string, payload []byte) error {
 	httpc := http.Client{
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
@@ -184,7 +184,6 @@ func (d *DockerClient) connectWithPriority(networkID, containerID string, ipv4, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 403 {
-		// already connected
 		return nil
 	}
 	if resp.StatusCode >= 400 {
@@ -192,6 +191,13 @@ func (d *DockerClient) connectWithPriority(networkID, containerID string, ipv4, 
 		return fmt.Errorf("docker API error: %s", string(body))
 	}
 	return nil
+}
+
+func (d *DockerClient) disconnectFromNetwork(containerID, networkID string) error {
+	return d.client.DisconnectNetwork(networkID, docker.NetworkConnectionOptions{
+		Container: containerID,
+		Force:     true,
+	})
 }
 
 func (d *DockerClient) isIPAssignedOnNetwork(networkName, ip string) (bool, string) {
@@ -223,13 +229,13 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 	for _, nw := range d.config.Networks {
 
 		dnw, err := d.findNetwork(nw)
+		if err != nil {
+			logger.Errorf("Error finding network '%s': %v", nw, err)
+			continue
+		}
 		if d.isConnectedToNetwork(c, dnw.ID) {
 			logger.Debugf("Container '%s' already connected to network '%s'", containerName, dnw.Name)
 			d.saveIp(c, dnw)
-			continue
-		}
-		if err != nil {
-			logger.Errorf("Error finding network '%s': %v", nw, err)
 			continue
 		}
 
@@ -261,7 +267,7 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 		}
 
 		if dnw.Driver == "macvlan" {
-			err = d.connectWithPriority(dnw.ID, c.ID, containerIPv4, containerIPv6)
+			err = d.connectMacvlanWithConflictHandling(c, dnw, containerIPv4, containerIPv6)
 		} else {
 			opts := docker.NetworkConnectionOptions{
 				Container: c.ID,
@@ -288,6 +294,73 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 		}
 	}
 
+}
+
+func (d *DockerClient) connectMacvlanWithConflictHandling(c *docker.APIContainers, targetNetwork *docker.Network, ipv4, ipv6 string) error {
+	err := d.connectWithPriority(targetNetwork.ID, c.ID, ipv4, ipv6)
+	if err == nil || !strings.Contains(err.Error(), "gateway") {
+		return err
+	}
+
+	logger.Warnf("Gateway conflict connecting '%s' to '%s', temporarily disconnecting from other macvlan networks", cleanContainerName(c.Names[0]), targetNetwork.Name)
+
+	type savedNetwork struct {
+		networkID string
+		name      string
+		ipv4      string
+		ipv6      string
+	}
+	var disconnected []savedNetwork
+	for _, nw := range c.Networks.Networks {
+		if nw.NetworkID == targetNetwork.ID {
+			continue
+		}
+		dnw, err := d.findNetworkByID(nw.NetworkID)
+		if err != nil || dnw.Driver != "macvlan" {
+			continue
+		}
+		if d.disconnectFromNetwork(c.ID, nw.NetworkID) == nil {
+			logger.Debugf("Temporarily disconnected '%s' from '%s'", cleanContainerName(c.Names[0]), dnw.Name)
+			disconnected = append(disconnected, savedNetwork{
+				networkID: nw.NetworkID,
+				name:      dnw.Name,
+				ipv4:      nw.IPAddress,
+				ipv6:      nw.GlobalIPv6Address,
+			})
+		}
+	}
+
+	err = d.connectWithPriority(targetNetwork.ID, c.ID, ipv4, ipv6)
+	if err != nil {
+		for _, sn := range disconnected {
+			d.client.ConnectNetwork(sn.networkID, docker.NetworkConnectionOptions{
+				Container: c.ID,
+				EndpointConfig: &docker.EndpointConfig{
+					IPAMConfig: &docker.EndpointIPAMConfig{
+						IPv4Address: sn.ipv4,
+						IPv6Address: sn.ipv6,
+					},
+				},
+			})
+			logger.Debugf("Reconnected '%s' to '%s'", cleanContainerName(c.Names[0]), sn.name)
+		}
+		return err
+	}
+
+	for _, sn := range disconnected {
+		d.client.ConnectNetwork(sn.networkID, docker.NetworkConnectionOptions{
+			Container: c.ID,
+			EndpointConfig: &docker.EndpointConfig{
+				IPAMConfig: &docker.EndpointIPAMConfig{
+					IPv4Address: sn.ipv4,
+					IPv6Address: sn.ipv6,
+				},
+			},
+		})
+		logger.Debugf("Reconnected '%s' to '%s'", cleanContainerName(c.Names[0]), sn.name)
+	}
+
+	return nil
 }
 
 func (d *DockerClient) saveIp(c *docker.APIContainers, dnw *docker.Network) {
@@ -339,6 +412,14 @@ func (d *DockerClient) findNetwork(name string) (*docker.Network, error) {
 		}
 	}
 	return nil, fmt.Errorf("network '%s' not found", name)
+}
+
+func (d *DockerClient) findNetworkByID(id string) (*docker.Network, error) {
+	network, err := d.client.NetworkInfo(id)
+	if err != nil {
+		return nil, fmt.Errorf("error getting network: %w", err)
+	}
+	return network, nil
 }
 
 func cleanContainerName(name string) string {
