@@ -263,15 +263,18 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 				Container: c.ID,
 			}
 			if containerIPv4 != "" || containerIPv6 != "" {
+				ipam := &docker.EndpointIPAMConfig{}
+				if containerIPv4 != "" {
+					ipam.IPv4Address = containerIPv4
+				}
+				if containerIPv6 != "" {
+					ipam.IPv6Address = containerIPv6
+				}
 				opts.EndpointConfig = &docker.EndpointConfig{
-					IPAMConfig: &docker.EndpointIPAMConfig{
-						IPv4Address: containerIPv4,
-						IPv6Address: containerIPv6,
-					},
+					IPAMConfig: ipam,
 				}
 			}
 			err = d.client.ConnectNetwork(dnw.ID, opts)
-
 		}
 
 		if err != nil {
