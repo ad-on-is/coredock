@@ -142,7 +142,7 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 func (d *DockerClient) connectWithPriority(networkID, containerID string, ipv4, ipv6 string) error {
 
 	pl := map[string]any{
-		"Container": containerID,
+		"Container":      containerID,
 		"EndpointConfig": map[string]any{},
 	}
 
@@ -157,6 +157,10 @@ func (d *DockerClient) connectWithPriority(networkID, containerID string, ipv4, 
 			ipamConfig["IPv6Address"] = ipv6
 		}
 		ep["IPAMConfig"] = ipamConfig
+	}
+
+	ep["DriverOpts"] = map[string]any{
+		"com.docker.network.endpoint.sysctls": "net.ipv6.conf.IFNAME.accept_ra=0",
 	}
 
 	payload, _ := json.Marshal(pl)
