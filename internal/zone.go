@@ -120,11 +120,13 @@ func (z *ZoneHandler) Update(services *[]Service, d *DNSProvider) {
 		logger.Debugf("Service '%s' added with IPs: %s", s.Name, s.IPs)
 	}
 	for domain, soa := range soas {
+		logger.Debug("Writing soa entries")
 		if err := z.writeZoneEntry(domain, soa, records[domain]); err != nil {
 			logger.Errorf("Error writing zone entry for domain %s: %s", domain, err)
 		}
 	}
 	for zone, rrs := range reverseRecords {
+		logger.Debug("Writing reverse zone entries")
 		if err := z.writeZoneEntry(zone, d.GetSOARecord(zone), rrs); err != nil {
 			logger.Errorf("Error writing reverse zone entry for zone %s: %s", zone, err)
 		}
