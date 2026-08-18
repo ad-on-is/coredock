@@ -139,20 +139,24 @@ func (d *DockerClient) getContainers() ([]docker.APIContainers, error) {
 	}).([]docker.APIContainers), nil
 }
 
-func (d *DockerClient) connectWithPriority(networkID, containerID string, priority int, containerIP string) error {
+func (d *DockerClient) connectWithPriority(networkID, containerID string, ipv4, ipv6 string) error {
 
 	pl := map[string]any{
 		"Container": containerID,
-		"EndpointConfig": map[string]any{
-			"GwPriority": priority,
-			"IPAMConfig": map[string]any{
-				"IPv4Address": containerIP,
-			},
-		},
+		"EndpointConfig": map[string]any{},
 	}
 
-	if containerIP != "" {
-		delete(pl["EndpointConfig"].(map[string]any), "IPAMConfig")
+	ep := pl["EndpointConfig"].(map[string]any)
+
+	if ipv4 != "" || ipv6 != "" {
+		ipamConfig := map[string]any{}
+		if ipv4 != "" {
+			ipamConfig["IPv4Address"] = ipv4
+		}
+		if ipv6 != "" {
+			ipamConfig["IPv6Address"] = ipv6
+		}
+		ep["IPAMConfig"] = ipamConfig
 	}
 
 	payload, _ := json.Marshal(pl)
@@ -226,33 +230,43 @@ func (d *DockerClient) maybeConnectToNetwork(c *docker.APIContainers) {
 		}
 
 		dbKey := fmt.Sprintf("%s-%s", containerName, dnw.Name)
-		containerIp := ""
+		containerIPv4 := ""
+		containerIPv6 := ""
 
 		if d.config.ReuseIPs {
 
-			containerIp = d.db.Get(dbKey)
-			logger.Debugf("container ip: %s", containerIp)
-			assigned, assignedTo := d.isIPAssignedOnNetwork(dnw.Name, containerIp)
-			if containerIp != "" {
+			containerIPv4 = d.db.Get(dbKey + ":ipv4")
+			containerIPv6 = d.db.Get(dbKey + ":ipv6")
+			logger.Debugf("container ipv4: %s ipv6: %s", containerIPv4, containerIPv6)
+			if containerIPv4 != "" {
+				assigned, assignedTo := d.isIPAssignedOnNetwork(dnw.Name, containerIPv4)
 				if assigned && containerName != assignedTo {
-					containerIp = ""
+					containerIPv4 = ""
 				} else {
-					logger.Infof("Found saved IP '%s' for '%s'", containerIp, containerName)
+					logger.Infof("Found saved IPv4 '%s' for '%s'", containerIPv4, containerName)
+				}
+			}
+			if containerIPv6 != "" {
+				assigned, assignedTo := d.isIPAssignedOnNetwork(dnw.Name, containerIPv6)
+				if assigned && containerName != assignedTo {
+					containerIPv6 = ""
+				} else {
+					logger.Infof("Found saved IPv6 '%s' for '%s'", containerIPv6, containerName)
 				}
 			}
 		}
 
 		if dnw.Driver == "macvlan" {
-			err = d.connectWithPriority(dnw.ID, c.ID, 9999, containerIp)
+			err = d.connectWithPriority(dnw.ID, c.ID, containerIPv4, containerIPv6)
 		} else {
 			opts := docker.NetworkConnectionOptions{
 				Container: c.ID,
 			}
-			if containerIp != "" {
+			if containerIPv4 != "" || containerIPv6 != "" {
 				opts.EndpointConfig = &docker.EndpointConfig{
-
 					IPAMConfig: &docker.EndpointIPAMConfig{
-						IPv4Address: containerIp,
+						IPv4Address: containerIPv4,
+						IPv6Address: containerIPv6,
 					},
 				}
 			}
@@ -283,8 +297,12 @@ func (d *DockerClient) saveIp(c *docker.APIContainers, dnw *docker.Network) {
 
 	for name, ep := range inspected.NetworkSettings.Networks {
 		if name == dnw.Name {
-			ip := ep.IPAddress
-			d.db.Set(dbKey, ip)
+			if ep.IPAddress != "" {
+				d.db.Set(dbKey+":ipv4", ep.IPAddress)
+			}
+			if ep.GlobalIPv6Address != "" {
+				d.db.Set(dbKey+":ipv6", ep.GlobalIPv6Address)
+			}
 		}
 	}
 }
