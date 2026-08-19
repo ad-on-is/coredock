@@ -121,7 +121,7 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 			s.Domains = append(s.Domains, ds...)
 		}
 
-		if key == "coredock.alias" {
+		if key == "coredock.aliases" {
 			as := funk.Map(strings.Split(value, ","), func(a string) string {
 				return strings.TrimSpace(a)
 			}).([]string)
@@ -138,6 +138,9 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 			if len(split) == 1 {
 				srv.Prefix = fmt.Sprintf("_http._tcp.%s", s.Name)
 				srv.Name = s.Name
+				for _, a := range s.Aliases {
+					s.SRVs = append(s.SRVs, SRV{Name: a, Prefix: fmt.Sprintf("_http._tcp.%s", s.Name), Port: port})
+				}
 			}
 			if len(split) == 2 {
 				name := split[1]
@@ -152,11 +155,12 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 					srv.Prefix = fmt.Sprintf("_http._tcp.%s", name)
 					srv.Name = name
 				}
+				if srv.Name != s.Name {
+					s.Aliases = append(s.Aliases, srv.Name)
+				}
 			}
 			s.SRVs = append(s.SRVs, srv)
-			if srv.Name != s.Name {
-				s.Aliases = append(s.Aliases, srv.Name)
-			}
+
 		}
 	}
 
