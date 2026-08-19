@@ -155,11 +155,12 @@ func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
 					srv.Prefix = fmt.Sprintf("_http._tcp.%s", name)
 					srv.Name = name
 				}
-				if srv.Name != s.Name {
-					s.Aliases = append(s.Aliases, srv.Name)
-				}
+
 			}
 			s.SRVs = append(s.SRVs, srv)
+			if srv.Name != s.Name {
+				s.Aliases = append(s.Aliases, srv.Name)
+			}
 
 		}
 	}
