@@ -28,7 +28,7 @@ corefileforward="
 . {
     log
     ${fanout} {
-      timeout 3s
+      timeout 300ms
   }
 }
 "
