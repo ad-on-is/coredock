@@ -48,10 +48,7 @@ func (d *DockerClient) sendContainers() {
 	}
 
 	currentNames := funk.Map(services, func(s Service) string {
-		sort.Slice(s.IPs, func(i, j int) bool {
-			return bytes.Compare(s.IPs[i], s.IPs[j]) < 0
-		})
-		return fmt.Sprintf("%s%v", s.Name, s.IPs)
+		return s.Hash()
 	}).([]string)
 
 	sort.Strings(currentNames)

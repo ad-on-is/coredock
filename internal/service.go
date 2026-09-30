@@ -1,10 +1,14 @@
 package internal
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -99,71 +103,123 @@ func NewService(c *docker.APIContainers, action string, conf *Config) *Service {
 	return s
 }
 
+func (s *Service) Hash() string {
+	b, _ := json.Marshal(s)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
 func (s *Service) GetHosts(domain string) []string {
 	return funk.FilterString(s.Hosts, func(h string) bool {
 		return strings.HasSuffix(h, domain)
 	})
 }
 
-func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
-	for key, value := range c.Labels {
-		if !strings.HasPrefix(key, "coredock") {
-			continue
+func injectLabels(s *Service, labels map[string]string, label string) {
+
+	switch label {
+	case "ignore":
+		for key, _ := range labels {
+			if key == "coredock.ignore" {
+				s.Ignore = true
+				return
+			}
 		}
-		// logger.Debugf("%s: %v", key, value)
-		if key == "coredock.ignore" {
-			s.Ignore = true
-		}
-		if key == "coredock.domains" {
+		return
+	case "domains":
+		for key, value := range labels {
+			if key != "coredock.domains" {
+				continue
+			}
 			ds := funk.Map(strings.Split(value, ","), func(d string) string {
 				return strings.TrimSpace(d)
 			}).([]string)
 			s.Domains = append(s.Domains, ds...)
 		}
-
-		if key == "coredock.aliases" {
+	case "aliases":
+		for key, value := range labels {
+			if key != "coredock.aliases" {
+				continue
+			}
 			as := funk.Map(strings.Split(value, ","), func(a string) string {
 				return strings.TrimSpace(a)
 			}).([]string)
 			s.Aliases = append(s.Aliases, as...)
 		}
+	case "srv":
 
-		if strings.HasPrefix(key, "coredock.srv") {
+		for key, value := range labels {
+			if key != "coredock.srv" {
+				continue
+			}
+			port, err := strconv.Atoi(value)
+			if err != nil {
+				continue
+			}
+			s.SRVs = append(s.SRVs, SRV{Port: port, Name: s.Name, Prefix: fmt.Sprintf("_http._tcp.%s", s.Name)})
+
+			for _, a := range s.Aliases {
+				s.SRVs = append(s.SRVs, SRV{Name: a, Prefix: fmt.Sprintf("_http._tcp.%s", a), Port: port})
+			}
+		}
+	case "srvs":
+		for key, value := range labels {
+			if !strings.HasPrefix(key, "coredock.srv--") {
+				continue
+			}
 			split := strings.Split(key, "--")
 			port, err := strconv.Atoi(value)
 			if err != nil {
 				continue
 			}
-			srv := SRV{Port: port}
-			if len(split) == 1 {
-				srv.Prefix = fmt.Sprintf("_http._tcp.%s", s.Name)
-				srv.Name = s.Name
-				for _, a := range s.Aliases {
-					s.SRVs = append(s.SRVs, SRV{Name: a, Prefix: fmt.Sprintf("_http._tcp.%s", a), Port: port})
-				}
-			}
-			if len(split) == 2 {
-				name := split[1]
-				pattern := "_([a-zA-Z0-9]+)._([a-zA-Z0-9]+).(.*)"
-				re := regexp.MustCompile(pattern)
-				matches := re.FindStringSubmatch(name)
-				if len(matches) == 4 {
-					name = matches[3]
-					srv.Prefix = fmt.Sprintf("_%s._%s.%s", matches[1], matches[2], name)
-					srv.Name = matches[3]
-				} else {
-					srv.Prefix = fmt.Sprintf("_http._tcp.%s", name)
-					srv.Name = name
-				}
 
+			if len(split) != 2 {
+				return
 			}
-			s.SRVs = append(s.SRVs, srv)
+			srv := SRV{Port: port}
+			name := split[1]
+			pattern := "_([a-zA-Z0-9]+)._([a-zA-Z0-9]+).(.*)"
+			re := regexp.MustCompile(pattern)
+			matches := re.FindStringSubmatch(name)
+			if len(matches) == 4 {
+				name = matches[3]
+				srv.Prefix = fmt.Sprintf("_%s._%s.%s", matches[1], matches[2], name)
+				srv.Name = matches[3]
+			} else {
+				srv.Prefix = fmt.Sprintf("_http._tcp.%s", name)
+				srv.Name = name
+			}
 			if srv.Name != s.Name {
 				s.Aliases = append(s.Aliases, srv.Name)
 			}
 
+			s.SRVs = append(s.SRVs, srv)
+
 		}
+	default:
+		return
 	}
+
+}
+
+func (s *Service) ParseLabels(c *docker.APIContainers) *Service {
+	injectLabels(s, c.Labels, "ignore")
+	if s.Ignore {
+		return s
+	}
+	injectLabels(s, c.Labels, "domains")
+	injectLabels(s, c.Labels, "aliases")
+	injectLabels(s, c.Labels, "srv")
+	injectLabels(s, c.Labels, "srvs")
+	sort.Strings(s.Aliases)
+	sort.Strings(s.Hosts)
+	sort.Strings(s.Domains)
+	sort.Slice(s.IPs, func(i, j int) bool {
+		return bytes.Compare(s.IPs[i], s.IPs[j]) < 0
+	})
+	sort.Slice(s.SRVs, func(i, j int) bool {
+		return bytes.Compare([]byte(s.SRVs[i].Name), []byte(s.SRVs[j].Name)) < 0
+	})
 
 	return s
 }
